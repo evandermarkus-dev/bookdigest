@@ -290,7 +290,7 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+    <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--app-surface)', border: '1px solid var(--app-border)' }}>
       {/* Confirm delete overlay */}
       {showConfirm && (
         <div className="p-5 sm:p-6 bg-red-50 border-b border-red-100 flex items-center justify-between gap-4">
@@ -321,13 +321,13 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
       )}
 
       {/* Header */}
-      <div className="p-5 sm:p-6 flex items-center justify-between hover:bg-gray-50 transition-colors">
+      <div className="p-5 sm:p-6 flex items-center justify-between transition-colors" style={{ borderLeft: '3px solid var(--app-accent)' }}>
         <button
           onClick={() => setExpanded(!expanded)}
           className="flex-1 min-w-0 pr-4 text-left"
         >
-          <p className="font-semibold text-gray-900 truncate">{title}</p>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <p className="font-semibold truncate" style={{ color: 'var(--app-text)' }}>{title}</p>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--app-muted)' }}>
             {STYLES.filter(s => summaries[s]).map(s => SUMMARY_STYLES[s].emoji).join(' ')}
             {' '}{existingCount}/3 styles
           </p>
@@ -356,7 +356,7 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
       {expanded && (
         <div className="border-t border-gray-100 animate-slide-down">
           {/* Style tabs */}
-          <div className="flex border-b border-gray-100 px-3 pt-2 gap-0.5 overflow-x-auto scrollbar-none">
+          <div className="flex px-3 pt-2 gap-0.5 overflow-x-auto scrollbar-none" style={{ borderBottom: '1px solid var(--app-border)' }}>
             {STYLES.map(style => {
               const info = SUMMARY_STYLES[style]
               const exists = !!summaries[style]
@@ -365,16 +365,14 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
                 <button
                   key={style}
                   onClick={() => setActiveTab(style)}
-                  className={`flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap shrink-0 ${
-                    activeTab === style
-                      ? 'bg-indigo-50 text-indigo-700 border-b-2 border-indigo-600'
-                      : exists
-                      ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                      : 'text-gray-400 hover:text-gray-500 hover:bg-gray-50'
-                  }`}
+                  className="flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap shrink-0"
+                  style={activeTab === style
+                    ? { background: 'var(--app-accent-dim)', color: '#8a6820', borderBottom: '2px solid var(--app-accent)' }
+                    : { color: exists ? 'var(--app-muted)' : '#a89880' }
+                  }
                 >
                   {isGenerating ? (
-                    <svg className="w-3.5 h-3.5 animate-spin text-indigo-500" fill="none" viewBox="0 0 24 24">
+                    <svg className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--app-accent)' }} fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                     </svg>
@@ -429,13 +427,13 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
                   <button
                     onClick={() => handleShare(activeTab)}
                     disabled={sharing}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg transition-colors disabled:opacity-50 ${
-                      copiedShare === activeTab
-                        ? 'text-green-600 border-green-200 bg-green-50'
-                        : shareUrls[activeTab]
-                        ? 'text-indigo-600 border-indigo-200 hover:border-indigo-400'
-                        : 'text-gray-500 hover:text-gray-800 border-gray-200 hover:border-gray-300'
-                    }`}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg transition-colors disabled:opacity-50"
+                    style={copiedShare === activeTab
+                      ? { color: '#16a34a', borderColor: '#bbf7d0', background: '#f0fdf4' }
+                      : shareUrls[activeTab]
+                      ? { color: 'var(--app-accent)', borderColor: 'rgba(201,150,58,0.4)' }
+                      : { color: 'var(--app-muted)', borderColor: 'var(--app-border)' }
+                    }
                   >
                     {copiedShare === activeTab ? (
                       <>
@@ -470,23 +468,23 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
                 <p className="text-gray-500 mb-1 font-medium">{SUMMARY_STYLES[activeTab].label} summary</p>
                 <p className="text-sm text-gray-400 mb-6">{SUMMARY_STYLES[activeTab].description}</p>
                 {atLimit ? (
-                  <div className="inline-block bg-gradient-to-br from-indigo-50 to-violet-50 border border-indigo-100 rounded-2xl p-5 max-w-xs text-left">
+                  <div className="inline-block rounded-2xl p-5 max-w-xs text-left" style={{ background: 'var(--app-accent-dim)', border: '1px solid rgba(201,150,58,0.25)' }}>
                     <p className="text-2xl mb-2">⚡</p>
-                    <p className="font-semibold text-gray-900 mb-1">Upgrade to Pro</p>
-                    <p className="text-sm text-gray-500 mb-3">
+                    <p className="font-semibold mb-1" style={{ color: 'var(--app-text)' }}>Upgrade to Pro</p>
+                    <p className="text-sm mb-3" style={{ color: 'var(--app-muted)' }}>
                       You&apos;ve used {FREE_LIMIT}/{FREE_LIMIT} summaries this month.
                     </p>
                     <ul className="space-y-1 mb-4">
                       {['Unlimited summaries', 'Priority processing', 'Advanced exports'].map(f => (
-                        <li key={f} className="text-sm text-indigo-700 flex items-center gap-1.5">
-                          <span className="text-indigo-400 font-bold">✓</span> {f}
+                        <li key={f} className="text-sm flex items-center gap-1.5" style={{ color: '#8a6820' }}>
+                          <span className="font-bold" style={{ color: 'var(--app-accent)' }}>✓</span> {f}
                         </li>
                       ))}
                     </ul>
                     <button
                       onClick={upgradeToStripe}
                       disabled={upgrading}
-                      className="w-full px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-60"
+                      className="w-full px-4 py-2 text-sm font-semibold rounded-xl transition-colors disabled:opacity-60" style={{ background: 'var(--app-accent)', color: '#1a0f00' }}
                     >
                       {upgrading ? 'Redirecting…' : 'Upgrade to Pro →'}
                     </button>
@@ -497,7 +495,7 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
                     <select
                       value={language}
                       onChange={e => setLanguage(e.target.value)}
-                      className="px-3 py-2 rounded-xl border border-gray-300 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                      className="px-3 py-2 rounded-xl text-sm focus:outline-none" style={{ border: '1px solid var(--app-border)', color: 'var(--app-text)', background: 'var(--app-surface)' }}
                     >
                       {LANGUAGES.map(lang => (
                         <option key={lang.code} value={lang.code}>{lang.label}</option>
@@ -506,7 +504,7 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
                     <button
                       onClick={() => generate(activeTab)}
                       disabled={!!generating}
-                      className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center gap-2 px-6 py-2 font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed" style={{ background: 'var(--app-accent)', color: '#1a0f00' }}
                     >
                       {generating === activeTab ? (
                         <>
@@ -549,12 +547,12 @@ function SummaryContent({ summary }: { summary: Summary }) {
         const label = FIELD_LABELS[key] ?? key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
         return (
           <div key={key}>
-            <p className="font-semibold text-gray-900 mb-2 text-base">{label}</p>
+            <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--app-accent)', letterSpacing: '0.08em' }}>{label}</p>
             {Array.isArray(value) ? (
               <ul className="space-y-2">
                 {(value as unknown[]).map((item, i) => (
                   <li key={i} className="flex gap-2">
-                    <span className="text-indigo-400 mt-0.5 shrink-0">•</span>
+                    <span className="mt-0.5 shrink-0" style={{ color: 'var(--app-accent)' }}>•</span>
                     <span>
                       {typeof item === 'object' && item !== null ? (
                         <span>

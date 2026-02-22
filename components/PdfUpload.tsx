@@ -213,12 +213,14 @@ export default function PdfUpload({ summariesThisMonth = 0 }: { summariesThisMon
       onDragOver={handleDragOver}
       onDragLeave={() => state === 'dragging' && setState('idle')}
       onClick={() => state === 'idle' && !atLimit && inputRef.current?.click()}
-      className={`
-        relative rounded-2xl border-2 border-dashed p-10 text-center transition-all bg-white
-        ${isDragging ? 'border-indigo-500 bg-indigo-50 scale-[1.01]' : 'border-indigo-200'}
-        ${state === 'idle' && !atLimit ? 'cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50' : ''}
-        ${state === 'error' ? 'border-red-300 bg-red-50' : ''}
-      `}
+      className={`relative rounded-2xl border-2 border-dashed p-10 text-center transition-all ${
+        state === 'idle' && !atLimit ? 'cursor-pointer' : ''
+      }`}
+      style={{
+        background: isDragging ? 'rgba(201,150,58,0.05)' : state === 'error' ? '#fef2f2' : 'var(--app-surface)',
+        borderColor: isDragging ? 'var(--app-accent)' : state === 'error' ? '#fca5a5' : 'var(--app-border)',
+        transform: isDragging ? 'scale(1.01)' : undefined,
+      }}
     >
       <input
         ref={inputRef}
@@ -242,12 +244,12 @@ export default function PdfUpload({ summariesThisMonth = 0 }: { summariesThisMon
               <p className="text-gray-500 mb-5">
                 You&apos;ve used all {FREE_LIMIT} free summaries this month.
               </p>
-              <div className="max-w-xs mx-auto bg-gradient-to-br from-indigo-50 to-violet-50 border border-indigo-100 rounded-2xl p-4 mb-5 text-left">
-                <p className="text-sm font-semibold text-gray-800 mb-2">⚡ BookDigest Pro</p>
+              <div className="max-w-xs mx-auto rounded-2xl p-4 mb-5 text-left" style={{ background: 'var(--app-accent-dim)', border: '1px solid rgba(201,150,58,0.25)' }}>
+                <p className="text-sm font-semibold mb-2" style={{ color: 'var(--app-text)' }}>⚡ BookDigest Pro</p>
                 <ul className="space-y-1.5">
                   {['Unlimited summaries', 'Priority processing', 'Advanced export options'].map(f => (
-                    <li key={f} className="text-sm text-indigo-700 flex items-center gap-1.5">
-                      <span className="text-indigo-400 font-bold">✓</span> {f}
+                    <li key={f} className="text-sm flex items-center gap-1.5" style={{ color: '#8a6820' }}>
+                      <span className="font-bold" style={{ color: 'var(--app-accent)' }}>✓</span> {f}
                     </li>
                   ))}
                 </ul>
@@ -255,7 +257,7 @@ export default function PdfUpload({ summariesThisMonth = 0 }: { summariesThisMon
               <button
                 onClick={upgradeToStripe}
                 disabled={upgrading}
-                className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                className="px-6 py-3 font-semibold rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed" style={{ background: 'var(--app-accent)', color: '#1a0f00' }}
               >
                 {upgrading ? 'Redirecting…' : 'Upgrade to Pro →'}
               </button>
@@ -274,7 +276,7 @@ export default function PdfUpload({ summariesThisMonth = 0 }: { summariesThisMon
                   <p className="text-gray-500 mb-6">Drag & drop or click to browse</p>
                   <button
                     onClick={(e) => { e.stopPropagation(); inputRef.current?.click() }}
-                    className="px-6 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 transition-colors"
+                    className="px-6 py-3 font-medium rounded-xl transition-colors" style={{ background: 'var(--app-accent)', color: '#1a0f00' }}
                   >
                     Choose PDF
                   </button>
@@ -289,7 +291,7 @@ export default function PdfUpload({ summariesThisMonth = 0 }: { summariesThisMon
       {/* Uploading */}
       {state === 'uploading' && (
         <>
-          <svg className="w-12 h-12 animate-spin text-indigo-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24">
+          <svg className="w-12 h-12 animate-spin mx-auto mb-4" style={{ color: 'var(--app-accent)' }} fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
           </svg>
@@ -314,11 +316,11 @@ export default function PdfUpload({ summariesThisMonth = 0 }: { summariesThisMon
                     <button
                       key={opt.value}
                       onClick={() => setAnswers(prev => ({ ...prev, [q.id]: opt.value }))}
-                      className={`px-3 py-2.5 rounded-xl border-2 text-sm text-left transition-all ${
-                        answers[q.id] === opt.value
-                          ? 'border-indigo-500 bg-indigo-50 text-indigo-800 font-medium'
-                          : 'border-gray-200 text-gray-600 hover:border-indigo-300'
-                      }`}
+                      className="px-3 py-2.5 rounded-xl border-2 text-sm text-left transition-all"
+                      style={answers[q.id] === opt.value
+                        ? { borderColor: 'var(--app-accent)', background: 'var(--app-accent-dim)', color: '#8a6820', fontWeight: 500 }
+                        : { borderColor: 'var(--app-border)', color: 'var(--app-muted)' }
+                      }
                     >
                       {opt.label}
                     </button>
@@ -348,11 +350,11 @@ export default function PdfUpload({ summariesThisMonth = 0 }: { summariesThisMon
               <button
                 key={key}
                 onClick={() => setSelectedStyle(key)}
-                className={`p-4 rounded-xl border-2 transition-all text-left ${
-                  selectedStyle === key
-                    ? 'border-indigo-500 bg-indigo-50'
-                    : 'border-gray-200 hover:border-indigo-300'
-                }`}
+                className="p-4 rounded-xl border-2 transition-all text-left"
+                style={selectedStyle === key
+                  ? { borderColor: 'var(--app-accent)', background: 'var(--app-accent-dim)' }
+                  : { borderColor: 'var(--app-border)' }
+                }
               >
                 <div className="text-2xl mb-1">{val.emoji}</div>
                 <div className="font-medium text-gray-900 text-sm">{val.label}</div>
@@ -366,7 +368,7 @@ export default function PdfUpload({ summariesThisMonth = 0 }: { summariesThisMon
             <select
               value={selectedLanguage}
               onChange={(e) => setSelectedLanguage(e.target.value)}
-              className="px-4 py-2 rounded-xl border border-gray-300 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              className="px-4 py-2 rounded-xl text-sm focus:outline-none" style={{ border: '1px solid var(--app-border)', color: 'var(--app-text)', background: 'var(--app-surface)' }}
             >
               {LANGUAGES.map((lang) => (
                 <option key={lang.code} value={lang.code}>{lang.label}</option>
@@ -383,7 +385,7 @@ export default function PdfUpload({ summariesThisMonth = 0 }: { summariesThisMon
             </button>
             <button
               onClick={handleGenerateSummary}
-              className="px-8 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 transition-colors"
+              className="px-8 py-3 font-medium rounded-xl transition-colors" style={{ background: 'var(--app-accent)', color: '#1a0f00' }}
             >
               Generate Summary
             </button>
@@ -394,7 +396,7 @@ export default function PdfUpload({ summariesThisMonth = 0 }: { summariesThisMon
       {/* Summarizing */}
       {state === 'summarizing' && (
         <>
-          <svg className="w-12 h-12 animate-spin text-indigo-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24">
+          <svg className="w-12 h-12 animate-spin mx-auto mb-4" style={{ color: 'var(--app-accent)' }} fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
           </svg>
@@ -411,7 +413,7 @@ export default function PdfUpload({ summariesThisMonth = 0 }: { summariesThisMon
           <p className="text-sm text-red-500 mb-6">{error}</p>
           <button
             onClick={(e) => { e.stopPropagation(); reset() }}
-            className="px-6 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 transition-colors"
+            className="px-6 py-3 font-medium rounded-xl transition-colors" style={{ background: 'var(--app-accent)', color: '#1a0f00' }}
           >
             Try again
           </button>

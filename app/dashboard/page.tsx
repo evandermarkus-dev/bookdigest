@@ -47,17 +47,20 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     .single()
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <main className="min-h-screen" style={{ background: 'var(--app-bg)' }}>
       <div className="max-w-4xl mx-auto px-6 py-12">
         {/* Header */}
         <div className="flex items-center justify-between mb-10 gap-4">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 shrink-0">📚 BookDigest</h1>
+          <h1 className="text-2xl sm:text-3xl shrink-0" style={{ fontFamily: 'var(--font-playfair), Georgia, serif', fontWeight: 700, color: 'var(--app-text)' }}>
+            Book<span style={{ color: 'var(--app-accent)' }}>Digest</span>
+          </h1>
           <div className="flex items-center gap-3 min-w-0">
-            <span className="text-sm text-gray-600 truncate hidden sm:block">{user.email}</span>
+            <span className="text-sm truncate hidden sm:block" style={{ color: 'var(--app-muted)' }}>{user.email}</span>
             <form action="/auth/signout" method="post">
               <button
                 type="submit"
-                className="text-sm text-gray-500 hover:text-gray-800 transition-colors whitespace-nowrap"
+                className="text-sm transition-colors whitespace-nowrap"
+                style={{ color: 'var(--app-muted)' }}
               >
                 Sign out
               </button>
@@ -67,11 +70,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
         {/* Pro upgrade success banner */}
         {justUpgraded && (
-          <div className="mb-6 bg-indigo-600 text-white rounded-2xl p-4 flex items-center gap-3">
+          <div className="mb-6 rounded-2xl p-4 flex items-center gap-3" style={{ background: 'var(--app-accent)', color: '#1a0f00' }}>
             <span className="text-2xl">⚡</span>
             <div>
               <p className="font-semibold">Welcome to BookDigest Pro!</p>
-              <p className="text-sm text-indigo-200">Unlimited summaries are now active. Enjoy!</p>
+              <p className="text-sm opacity-70">Unlimited summaries are now active. Enjoy!</p>
             </div>
           </div>
         )}
@@ -91,7 +94,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
         {/* Books */}
         <div className="mt-10">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Your Books</h2>
+          <h2 className="text-xl font-semibold mb-4" style={{ color: 'var(--app-text)' }}>Your Books</h2>
           {books.length > 0 ? (
             <div className="space-y-3">
               {books.map((book) => (
@@ -99,10 +102,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               ))}
             </div>
           ) : (
-            <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
+            <div className="rounded-2xl p-12 text-center" style={{ background: 'var(--app-surface)', border: '1px solid var(--app-border)' }}>
               <div className="text-5xl mb-4">📖</div>
-              <p className="text-gray-700 font-medium mb-1">No books yet</p>
-              <p className="text-sm text-gray-400">Upload a PDF above to generate your first summary</p>
+              <p className="font-medium mb-1" style={{ color: 'var(--app-text)' }}>No books yet</p>
+              <p className="text-sm" style={{ color: 'var(--app-muted)' }}>Upload a PDF above to generate your first summary</p>
             </div>
           )}
         </div>

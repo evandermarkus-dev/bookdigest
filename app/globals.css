@@ -5,6 +5,16 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* App (dashboard) warm palette */
+  --app-bg:      #f5f2ec;
+  --app-surface: #fdfbf5;
+  --app-border:  #e0d9cc;
+  --app-text:    #1a1714;
+  --app-muted:   #6b6359;
+  --app-accent:  #c9963a;
+  --app-accent-hover: #b8852e;
+  --app-accent-dim: rgba(201,150,58,0.10);
 }
 
 @theme inline {
