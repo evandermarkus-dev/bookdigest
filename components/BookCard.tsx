@@ -1,0 +1,587 @@
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import ReactMarkdown from 'react-markdown'
+import { SUMMARY_STYLES, LANGUAGES, FREE_LIMIT, buildUserContext, type SummaryStyle } from '@/lib/prompts'
+import { createClient } from '@/lib/supabase'
+
+const resetDateStr = new Date(
+  new Date().getFullYear(), new Date().getMonth() + 1, 1
+).toLocaleDateString('en', { month: 'long', day: 'numeric' })
+
+interface Summary {
+  id: string
+  file_name: string
+  file_path: string
+  style: SummaryStyle
+  content: string
+  created_at: string
+}
+
+export interface Book {
+  file_name: string
+  file_path: string
+  summaries: Partial<Record<SummaryStyle, Summary>>
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  overview: 'Overview',
+  key_insights: 'Key Insights',
+  core_message: 'Core Message',
+  relevance: 'Relevance',
+  main_concepts: 'Main Concepts',
+  key_chapters: 'Key Chapters',
+  important_quotes: 'Important Quotes',
+  study_questions: 'Study Questions',
+  immediate_actions: 'Immediate Actions',
+  weekly_habits: 'Weekly Habits',
+  tools_and_frameworks: 'Tools & Frameworks',
+  '30_day_plan': '30-Day Plan',
+}
+
+const STYLES: SummaryStyle[] = ['executive', 'study', 'action']
+
+function getTitle(summaries: Partial<Record<SummaryStyle, Summary>>, fileName: string): string {
+  for (const style of STYLES) {
+    const s = summaries[style]
+    if (s) {
+      try {
+        const parsed = JSON.parse(s.content)
+        if (parsed?.title) return parsed.title
+      } catch {}
+    }
+  }
+  return fileName
+}
+
+function fieldToText(value: unknown): string {
+  if (Array.isArray(value)) {
+    return (value as unknown[])
+      .map(item => {
+        if (typeof item === 'object' && item !== null) {
+          const vals = Object.values(item as Record<string, string>)
+          return `- **${vals[0]}**${vals.length > 1 ? ' — ' + vals.slice(1).join(' ') : ''}`
+        }
+        return `- ${String(item)}`
+      })
+      .join('\n')
+  }
+  return String(value)
+}
+
+function summaryToMarkdown(summary: Summary, title: string): string {
+  let parsed: Record<string, unknown>
+  try { parsed = JSON.parse(summary.content) } catch { return summary.content }
+
+  const styleInfo = SUMMARY_STYLES[summary.style]
+  const lines: string[] = [
+    `# ${title}`,
+    `*${styleInfo.label} Summary — BookDigest*`,
+    '',
+  ]
+
+  for (const [key, value] of Object.entries(parsed)) {
+    if (key === 'title') continue
+    const label = FIELD_LABELS[key] ?? key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+    lines.push(`## ${label}`, '', fieldToText(value), '')
+  }
+
+  return lines.join('\n')
+}
+
+function downloadMarkdown(summary: Summary, title: string) {
+  const md = summaryToMarkdown(summary, title)
+  const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${title.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${summary.style}.md`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function printSummary(summary: Summary, title: string) {
+  let parsed: Record<string, unknown>
+  try { parsed = JSON.parse(summary.content) } catch { return }
+
+  const styleInfo = SUMMARY_STYLES[summary.style]
+
+  let body = `<h1>${title}</h1><p class="subtitle">${styleInfo.emoji} ${styleInfo.label} Summary · BookDigest</p>`
+
+  for (const [key, value] of Object.entries(parsed)) {
+    if (key === 'title') continue
+    const label = FIELD_LABELS[key] ?? key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+    body += `<h2>${label}</h2>`
+    if (Array.isArray(value)) {
+      body += '<ul>'
+      for (const item of value as unknown[]) {
+        if (typeof item === 'object' && item !== null) {
+          const vals = Object.values(item as Record<string, string>)
+          body += `<li><strong>${vals[0]}</strong>${vals.length > 1 ? ' — ' + vals.slice(1).join(' ') : ''}</li>`
+        } else {
+          body += `<li>${String(item)}</li>`
+        }
+      }
+      body += '</ul>'
+    } else {
+      body += `<p>${String(value)}</p>`
+    }
+  }
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title><style>
+    body{font-family:Georgia,serif;max-width:680px;margin:40px auto;color:#111;font-size:15px;line-height:1.7}
+    h1{font-size:22px;margin-bottom:2px}
+    .subtitle{color:#666;font-size:12px;margin-bottom:32px}
+    h2{font-size:14px;font-weight:700;margin-top:28px;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;color:#333;border-bottom:1px solid #eee;padding-bottom:4px}
+    ul{margin:0;padding-left:20px}li{margin-bottom:6px}
+    p{margin:0}@media print{body{margin:20px}}
+  </style></head><body>${body}</body></html>`
+
+  const win = window.open('', '_blank')
+  if (!win) return
+  win.document.write(html)
+  win.document.close()
+  win.focus()
+  win.print()
+}
+
+export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book; summariesThisMonth?: number }) {
+  const router = useRouter()
+  const supabase = createClient()
+  const firstExisting = STYLES.find(s => book.summaries[s]) ?? 'executive'
+  const [expanded, setExpanded] = useState(false)
+  const [activeTab, setActiveTab] = useState<SummaryStyle>(firstExisting)
+  const [generating, setGenerating] = useState<SummaryStyle | null>(null)
+  const [language, setLanguage] = useState('auto')
+  const [error, setError] = useState<string | null>(null)
+  const [summaries, setSummaries] = useState(book.summaries)
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  const existingCount = STYLES.filter(s => summaries[s]).length
+  const atLimit = summariesThisMonth >= FREE_LIMIT
+  const title = getTitle(summaries, book.file_name)
+  const [downloaded, setDownloaded] = useState<SummaryStyle | null>(null)
+  const [upgrading, setUpgrading] = useState(false)
+
+  async function upgradeToStripe() {
+    setUpgrading(true)
+    try {
+      const res = await fetch('/api/stripe/checkout', { method: 'POST' })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+    } catch {
+      setUpgrading(false)
+    }
+  }
+  const [sharing, setSharing] = useState(false)
+  const [shareUrls, setShareUrls] = useState<Partial<Record<SummaryStyle, string>>>({})
+  const [copiedShare, setCopiedShare] = useState<SummaryStyle | null>(null)
+
+  async function handleShare(style: SummaryStyle) {
+    const summary = summaries[style]
+    if (!summary) return
+
+    // If URL already cached, just copy again
+    if (shareUrls[style]) {
+      await navigator.clipboard.writeText(shareUrls[style]!)
+      setCopiedShare(style)
+      setTimeout(() => setCopiedShare(null), 2000)
+      return
+    }
+
+    setSharing(true)
+    try {
+      const res = await fetch('/api/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ summaryId: summary.id }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        const url = `${window.location.origin}/s/${data.token}`
+        setShareUrls(prev => ({ ...prev, [style]: url }))
+        await navigator.clipboard.writeText(url)
+        setCopiedShare(style)
+        setTimeout(() => setCopiedShare(null), 2500)
+      } else {
+        setError(data.error ?? 'Failed to create share link')
+      }
+    } catch {
+      setError('Network error — could not create share link')
+    } finally {
+      setSharing(false)
+    }
+  }
+
+  function handleDownload(style: SummaryStyle) {
+    downloadMarkdown(summaries[style]!, title)
+    setDownloaded(style)
+    setTimeout(() => setDownloaded(null), 2000)
+  }
+
+  async function deleteBook() {
+    setDeleting(true)
+    try {
+      const res = await fetch(
+        `/api/delete-book?filePath=${encodeURIComponent(book.file_path)}`,
+        { method: 'DELETE' }
+      )
+      if (res.ok) {
+        window.location.reload()
+      } else {
+        const data = await res.json()
+        setError(data.error ?? 'Delete failed')
+        setShowConfirm(false)
+        setDeleting(false)
+      }
+    } catch {
+      setError('Network error — please try again')
+      setShowConfirm(false)
+      setDeleting(false)
+    }
+  }
+
+  async function generate(style: SummaryStyle) {
+    setGenerating(style)
+    setError(null)
+
+    // Load user context from DB, fall back to localStorage
+    let userContext: string | undefined
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('goal, level, focus')
+          .eq('user_id', user.id)
+          .single()
+        if (profile) userContext = buildUserContext(profile)
+      }
+    } catch {}
+    if (!userContext) {
+      userContext = localStorage.getItem('bookdigest_user_context') ?? undefined
+    }
+
+    try {
+      const res = await fetch('/api/summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filePath: book.file_path,
+          fileName: book.file_name,
+          style,
+          language,
+          userContext,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error ?? 'Something went wrong')
+      } else {
+        setSummaries(prev => ({ ...prev, [style]: data.summary }))
+      }
+    } catch {
+      setError('Network error — please try again')
+    } finally {
+      setGenerating(null)
+    }
+  }
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+      {/* Confirm delete overlay */}
+      {showConfirm && (
+        <div className="p-5 sm:p-6 bg-red-50 border-b border-red-100 flex items-center justify-between gap-4">
+          <p className="text-sm text-red-700 font-medium">Delete this book and all its summaries?</p>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setShowConfirm(false)}
+              disabled={deleting}
+              className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={deleteBook}
+              disabled={deleting}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+            >
+              {deleting ? (
+                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+              ) : null}
+              Delete
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="p-5 sm:p-6 flex items-center justify-between hover:bg-gray-50 transition-colors">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex-1 min-w-0 pr-4 text-left"
+        >
+          <p className="font-semibold text-gray-900 truncate">{title}</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {STYLES.filter(s => summaries[s]).map(s => SUMMARY_STYLES[s].emoji).join(' ')}
+            {' '}{existingCount}/3 styles
+          </p>
+        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowConfirm(true); setExpanded(true) }}
+            className="p-1.5 text-gray-300 hover:text-red-400 transition-colors rounded-lg hover:bg-red-50"
+            title="Delete book"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+          <button onClick={() => setExpanded(!expanded)}>
+            <svg
+              className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="border-t border-gray-100 animate-slide-down">
+          {/* Style tabs */}
+          <div className="flex border-b border-gray-100 px-3 pt-2 gap-0.5 overflow-x-auto scrollbar-none">
+            {STYLES.map(style => {
+              const info = SUMMARY_STYLES[style]
+              const exists = !!summaries[style]
+              const isGenerating = generating === style
+              return (
+                <button
+                  key={style}
+                  onClick={() => setActiveTab(style)}
+                  className={`flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap shrink-0 ${
+                    activeTab === style
+                      ? 'bg-indigo-50 text-indigo-700 border-b-2 border-indigo-600'
+                      : exists
+                      ? 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                      : 'text-gray-400 hover:text-gray-500 hover:bg-gray-50'
+                  }`}
+                >
+                  {isGenerating ? (
+                    <svg className="w-3.5 h-3.5 animate-spin text-indigo-500" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                  ) : (
+                    <span>{info.emoji}</span>
+                  )}
+                  <span>{info.label}</span>
+                  {!exists && !isGenerating && <span className="text-xs opacity-40">+</span>}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Tab content */}
+          <div className="p-5 sm:p-6">
+            {summaries[activeTab] ? (
+              <>
+                {/* Export toolbar */}
+                <div className="flex items-center justify-end gap-2 mb-5 flex-wrap">
+                  <button
+                    onClick={() => handleDownload(activeTab)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg transition-colors
+                      text-gray-500 hover:text-gray-800 border-gray-200 hover:border-gray-300
+                      data-[done=true]:text-green-600 data-[done=true]:border-green-200"
+                    data-done={downloaded === activeTab}
+                  >
+                    {downloaded === activeTab ? (
+                      <>
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        Downloaded!
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Markdown
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => printSummary(summaries[activeTab]!, title)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 hover:text-gray-800 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                    </svg>
+                    Print / PDF
+                  </button>
+                  <button
+                    onClick={() => handleShare(activeTab)}
+                    disabled={sharing}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg transition-colors disabled:opacity-50 ${
+                      copiedShare === activeTab
+                        ? 'text-green-600 border-green-200 bg-green-50'
+                        : shareUrls[activeTab]
+                        ? 'text-indigo-600 border-indigo-200 hover:border-indigo-400'
+                        : 'text-gray-500 hover:text-gray-800 border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    {copiedShare === activeTab ? (
+                      <>
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        Link copied!
+                      </>
+                    ) : sharing ? (
+                      <>
+                        <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                        </svg>
+                        Sharing…
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                        </svg>
+                        Share
+                      </>
+                    )}
+                  </button>
+                </div>
+                <SummaryContent summary={summaries[activeTab]!} />
+              </>
+            ) : (
+              <div className="text-center py-10">
+                <div className="text-4xl mb-3">{SUMMARY_STYLES[activeTab].emoji}</div>
+                <p className="text-gray-500 mb-1 font-medium">{SUMMARY_STYLES[activeTab].label} summary</p>
+                <p className="text-sm text-gray-400 mb-6">{SUMMARY_STYLES[activeTab].description}</p>
+                {atLimit ? (
+                  <div className="inline-block bg-gradient-to-br from-indigo-50 to-violet-50 border border-indigo-100 rounded-2xl p-5 max-w-xs text-left">
+                    <p className="text-2xl mb-2">⚡</p>
+                    <p className="font-semibold text-gray-900 mb-1">Upgrade to Pro</p>
+                    <p className="text-sm text-gray-500 mb-3">
+                      You&apos;ve used {FREE_LIMIT}/{FREE_LIMIT} summaries this month.
+                    </p>
+                    <ul className="space-y-1 mb-4">
+                      {['Unlimited summaries', 'Priority processing', 'Advanced exports'].map(f => (
+                        <li key={f} className="text-sm text-indigo-700 flex items-center gap-1.5">
+                          <span className="text-indigo-400 font-bold">✓</span> {f}
+                        </li>
+                      ))}
+                    </ul>
+                    <button
+                      onClick={upgradeToStripe}
+                      disabled={upgrading}
+                      className="w-full px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-60"
+                    >
+                      {upgrading ? 'Redirecting…' : 'Upgrade to Pro →'}
+                    </button>
+                    <p className="text-xs text-gray-400 mt-2 text-center">Resets {resetDateStr}</p>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center gap-3 flex-wrap">
+                    <select
+                      value={language}
+                      onChange={e => setLanguage(e.target.value)}
+                      className="px-3 py-2 rounded-xl border border-gray-300 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    >
+                      {LANGUAGES.map(lang => (
+                        <option key={lang.code} value={lang.code}>{lang.label}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => generate(activeTab)}
+                      disabled={!!generating}
+                      className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {generating === activeTab ? (
+                        <>
+                          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                          </svg>
+                          Generating…
+                        </>
+                      ) : (
+                        `Generate ${SUMMARY_STYLES[activeTab].label}`
+                      )}
+                    </button>
+                  </div>
+                )}
+                {error && <p className="text-red-500 text-sm mt-3">{error}</p>}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SummaryContent({ summary }: { summary: Summary }) {
+  let parsed: Record<string, unknown> | null = null
+  try {
+    parsed = JSON.parse(summary.content)
+  } catch {
+    parsed = null
+  }
+
+  if (!parsed) return <p className="text-gray-400 text-sm">Could not parse summary.</p>
+
+  return (
+    <div className="space-y-5 text-sm text-gray-700">
+      {Object.entries(parsed).map(([key, value]) => {
+        if (key === 'title') return null
+        const label = FIELD_LABELS[key] ?? key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+        return (
+          <div key={key}>
+            <p className="font-semibold text-gray-900 mb-2 text-base">{label}</p>
+            {Array.isArray(value) ? (
+              <ul className="space-y-2">
+                {(value as unknown[]).map((item, i) => (
+                  <li key={i} className="flex gap-2">
+                    <span className="text-indigo-400 mt-0.5 shrink-0">•</span>
+                    <span>
+                      {typeof item === 'object' && item !== null ? (
+                        <span>
+                          {Object.entries(item as Record<string, string>).map(([k, v], j) => (
+                            <span key={k}>
+                              {j > 0 && <span className="text-gray-400"> — </span>}
+                              {j === 0
+                                ? <strong>{v}</strong>
+                                : <span className="prose prose-sm max-w-none"><ReactMarkdown>{v}</ReactMarkdown></span>}
+                            </span>
+                          ))}
+                        </span>
+                      ) : (
+                        <div className="prose prose-sm max-w-none"><ReactMarkdown>{String(item)}</ReactMarkdown></div>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="prose prose-sm max-w-none text-gray-700 leading-relaxed">
+                <ReactMarkdown>{String(value)}</ReactMarkdown>
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}

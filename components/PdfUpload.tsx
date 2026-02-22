@@ -1,0 +1,422 @@
+'use client'
+
+import { useState, useRef, useEffect, DragEvent, ChangeEvent } from 'react'
+import { createClient } from '@/lib/supabase'
+import { SUMMARY_STYLES, LANGUAGES, FREE_LIMIT, buildUserContext, type SummaryStyle, type UserProfile } from '@/lib/prompts'
+
+const MAX_SIZE_MB = 50
+const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024
+
+type UploadState = 'idle' | 'dragging' | 'uploading' | 'questionnaire' | 'select_style' | 'summarizing' | 'error'
+
+const QUESTIONS = [
+  {
+    id: 'goal',
+    label: 'What is your main goal with this book?',
+    options: [
+      { value: 'apply', label: '💼 Apply to my work' },
+      { value: 'learn', label: '🎓 Deep understanding' },
+      { value: 'reference', label: '📌 Quick reference' },
+      { value: 'teach', label: '👥 Teach others' },
+    ],
+  },
+  {
+    id: 'level',
+    label: 'What is your experience level with this topic?',
+    options: [
+      { value: 'beginner', label: '🌱 Complete beginner' },
+      { value: 'some', label: '📖 Some familiarity' },
+      { value: 'intermediate', label: '⚡ Intermediate' },
+      { value: 'expert', label: '🏆 Advanced / Expert' },
+    ],
+  },
+  {
+    id: 'focus',
+    label: 'What should the summary focus on?',
+    options: [
+      { value: 'practical', label: '🔧 Practical steps' },
+      { value: 'theory', label: '🔬 Theory & concepts' },
+      { value: 'insights', label: '💡 Key insights only' },
+      { value: 'comprehensive', label: '📚 Everything in detail' },
+    ],
+  },
+] as const
+
+type QuestionId = typeof QUESTIONS[number]['id']
+
+const resetDateStr = new Date(
+  new Date().getFullYear(), new Date().getMonth() + 1, 1
+).toLocaleDateString('en', { month: 'long', day: 'numeric' })
+
+export default function PdfUpload({ summariesThisMonth = 0 }: { summariesThisMonth?: number }) {
+  const atLimit = summariesThisMonth >= FREE_LIMIT
+  const [state, setState] = useState<UploadState>('idle')
+  const [error, setError] = useState<string | null>(null)
+  const [upgrading, setUpgrading] = useState(false)
+
+  async function upgradeToStripe(e: React.MouseEvent) {
+    e.stopPropagation()
+    setUpgrading(true)
+    try {
+      const res = await fetch('/api/stripe/checkout', { method: 'POST' })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+    } catch {
+      setUpgrading(false)
+    }
+  }
+  const [fileName, setFileName] = useState<string | null>(null)
+  const [filePath, setFilePath] = useState<string | null>(null)
+  const [selectedStyle, setSelectedStyle] = useState<SummaryStyle>('executive')
+  const [selectedLanguage, setSelectedLanguage] = useState('auto')
+  const [answers, setAnswers] = useState<Record<QuestionId, string>>({
+    goal: 'apply',
+    level: 'intermediate',
+    focus: 'practical',
+  })
+  const inputRef = useRef<HTMLInputElement>(null)
+  const supabase = createClient()
+
+  // Load saved profile from Supabase on mount
+  useEffect(() => {
+    async function loadProfile() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase
+        .from('user_profiles')
+        .select('goal, level, focus')
+        .eq('user_id', user.id)
+        .single()
+      if (data) {
+        setAnswers({ goal: data.goal, level: data.level, focus: data.focus })
+      }
+    }
+    loadProfile()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function validate(file: File): string | null {
+    if (file.type !== 'application/pdf') return 'Only PDF files are allowed'
+    if (file.size > MAX_SIZE_BYTES) return `File must be under ${MAX_SIZE_MB}MB`
+    return null
+  }
+
+  async function uploadFile(file: File) {
+    const validationError = validate(file)
+    if (validationError) {
+      setError(validationError)
+      setState('error')
+      return
+    }
+
+    setFileName(file.name)
+    setState('uploading')
+    setError(null)
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      setError('Not authenticated')
+      setState('error')
+      return
+    }
+
+    const path = `${user.id}/${Date.now()}-${file.name}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('Books')
+      .upload(path, file, { upsert: false })
+
+    if (uploadError) {
+      setError(uploadError.message)
+      setState('error')
+      return
+    }
+
+    setFilePath(path)
+    setState('questionnaire')
+  }
+
+  // Save profile to DB, then advance to style selection
+  async function handleContinue() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const profile: UserProfile = { goal: answers.goal, level: answers.level, focus: answers.focus }
+      await supabase.from('user_profiles').upsert(
+        { user_id: user.id, ...profile, updated_at: new Date().toISOString() },
+        { onConflict: 'user_id' }
+      )
+    }
+    setState('select_style')
+  }
+
+  async function handleGenerateSummary() {
+    if (!filePath || !fileName) return
+    setState('summarizing')
+    setError(null)
+
+    const profile: UserProfile = { goal: answers.goal, level: answers.level, focus: answers.focus }
+    const userContext = buildUserContext(profile)
+    localStorage.setItem('bookdigest_user_context', userContext)
+
+    try {
+      const res = await fetch('/api/summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filePath,
+          fileName,
+          style: selectedStyle,
+          language: selectedLanguage,
+          userContext,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error ?? 'Something went wrong')
+        setState('error')
+        return
+      }
+
+      window.location.reload()
+    } catch {
+      setError('Network error — please try again')
+      setState('error')
+    }
+  }
+
+  function handleDrop(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault()
+    setState('idle')
+    const file = e.dataTransfer.files[0]
+    if (file) uploadFile(file)
+  }
+
+  function handleDragOver(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault()
+    setState('dragging')
+  }
+
+  function reset() {
+    setState('idle')
+    setError(null)
+    setFileName(null)
+    setFilePath(null)
+    if (inputRef.current) inputRef.current.value = ''
+  }
+
+  const isDragging = state === 'dragging'
+
+  return (
+    <div
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      onDragLeave={() => state === 'dragging' && setState('idle')}
+      onClick={() => state === 'idle' && !atLimit && inputRef.current?.click()}
+      className={`
+        relative rounded-2xl border-2 border-dashed p-10 text-center transition-all bg-white
+        ${isDragging ? 'border-indigo-500 bg-indigo-50 scale-[1.01]' : 'border-indigo-200'}
+        ${state === 'idle' && !atLimit ? 'cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50' : ''}
+        ${state === 'error' ? 'border-red-300 bg-red-50' : ''}
+      `}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept="application/pdf"
+        className="hidden"
+        onChange={(e: ChangeEvent<HTMLInputElement>) => {
+          const file = e.target.files?.[0]
+          if (file) uploadFile(file)
+        }}
+      />
+
+      {/* Idle / Dragging */}
+      {(state === 'idle' || state === 'dragging') && (
+        <>
+          {atLimit ? (
+            /* ── Upgrade panel ── */
+            <div onClick={(e) => e.stopPropagation()}>
+              <div className="text-5xl mb-4">🔒</div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Monthly limit reached</h2>
+              <p className="text-gray-500 mb-5">
+                You&apos;ve used all {FREE_LIMIT} free summaries this month.
+              </p>
+              <div className="max-w-xs mx-auto bg-gradient-to-br from-indigo-50 to-violet-50 border border-indigo-100 rounded-2xl p-4 mb-5 text-left">
+                <p className="text-sm font-semibold text-gray-800 mb-2">⚡ BookDigest Pro</p>
+                <ul className="space-y-1.5">
+                  {['Unlimited summaries', 'Priority processing', 'Advanced export options'].map(f => (
+                    <li key={f} className="text-sm text-indigo-700 flex items-center gap-1.5">
+                      <span className="text-indigo-400 font-bold">✓</span> {f}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <button
+                onClick={upgradeToStripe}
+                disabled={upgrading}
+                className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {upgrading ? 'Redirecting…' : 'Upgrade to Pro →'}
+              </button>
+              <p className="text-xs text-gray-400 mt-3">
+                Free limit resets on {resetDateStr}
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="text-5xl mb-4">{isDragging ? '📂' : '📄'}</div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                {isDragging ? 'Drop it here!' : 'Upload a PDF book'}
+              </h2>
+              {!isDragging && (
+                <>
+                  <p className="text-gray-500 mb-6">Drag & drop or click to browse</p>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); inputRef.current?.click() }}
+                    className="px-6 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 transition-colors"
+                  >
+                    Choose PDF
+                  </button>
+                  <p className="text-xs text-gray-400 mt-4">PDF only · Max {MAX_SIZE_MB}MB</p>
+                </>
+              )}
+            </>
+          )}
+        </>
+      )}
+
+      {/* Uploading */}
+      {state === 'uploading' && (
+        <>
+          <svg className="w-12 h-12 animate-spin text-indigo-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+          </svg>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Uploading…</h2>
+          <p className="text-sm text-gray-500 truncate max-w-xs mx-auto">{fileName}</p>
+        </>
+      )}
+
+      {/* Questionnaire */}
+      {state === 'questionnaire' && (
+        <div onClick={(e) => e.stopPropagation()} className="max-w-lg mx-auto">
+          <div className="text-4xl mb-3">✅</div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-1">Upload complete!</h2>
+          <p className="text-sm text-gray-500 mb-6">Answer 3 quick questions to personalise your summary</p>
+
+          <div className="space-y-6 text-left">
+            {QUESTIONS.map((q) => (
+              <div key={q.id}>
+                <p className="text-sm font-medium text-gray-700 mb-2">{q.label}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {q.options.map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setAnswers(prev => ({ ...prev, [q.id]: opt.value }))}
+                      className={`px-3 py-2.5 rounded-xl border-2 text-sm text-left transition-all ${
+                        answers[q.id] === opt.value
+                          ? 'border-indigo-500 bg-indigo-50 text-indigo-800 font-medium'
+                          : 'border-gray-200 text-gray-600 hover:border-indigo-300'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={handleContinue}
+            className="mt-8 px-8 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 transition-colors"
+          >
+            Continue →
+          </button>
+        </div>
+      )}
+
+      {/* Select Style */}
+      {state === 'select_style' && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <h2 className="text-xl font-semibold text-gray-900 mb-1">Choose summary style</h2>
+          <p className="text-sm text-gray-500 mb-6 truncate max-w-xs mx-auto">{fileName}</p>
+
+          <div className="grid grid-cols-3 gap-3 max-w-lg mx-auto mb-6">
+            {(Object.entries(SUMMARY_STYLES) as [SummaryStyle, typeof SUMMARY_STYLES[SummaryStyle]][]).map(([key, val]) => (
+              <button
+                key={key}
+                onClick={() => setSelectedStyle(key)}
+                className={`p-4 rounded-xl border-2 transition-all text-left ${
+                  selectedStyle === key
+                    ? 'border-indigo-500 bg-indigo-50'
+                    : 'border-gray-200 hover:border-indigo-300'
+                }`}
+              >
+                <div className="text-2xl mb-1">{val.emoji}</div>
+                <div className="font-medium text-gray-900 text-sm">{val.label}</div>
+                <div className="text-xs text-gray-500">{val.description}</div>
+              </button>
+            ))}
+          </div>
+
+          <div className="mb-6">
+            <p className="text-sm font-medium text-gray-700 mb-2">Output language:</p>
+            <select
+              value={selectedLanguage}
+              onChange={(e) => setSelectedLanguage(e.target.value)}
+              className="px-4 py-2 rounded-xl border border-gray-300 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            >
+              {LANGUAGES.map((lang) => (
+                <option key={lang.code} value={lang.code}>{lang.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() => setState('questionnaire')}
+              className="px-4 py-3 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              ← Back
+            </button>
+            <button
+              onClick={handleGenerateSummary}
+              className="px-8 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 transition-colors"
+            >
+              Generate Summary
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Summarizing */}
+      {state === 'summarizing' && (
+        <>
+          <svg className="w-12 h-12 animate-spin text-indigo-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+          </svg>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Generating summary…</h2>
+          <p className="text-sm text-gray-500">This takes about 30–60 seconds</p>
+        </>
+      )}
+
+      {/* Error */}
+      {state === 'error' && (
+        <>
+          <div className="text-5xl mb-4">❌</div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Something went wrong</h2>
+          <p className="text-sm text-red-500 mb-6">{error}</p>
+          <button
+            onClick={(e) => { e.stopPropagation(); reset() }}
+            className="px-6 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 transition-colors"
+          >
+            Try again
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
