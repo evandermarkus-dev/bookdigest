@@ -1,7 +1,5 @@
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-
 const FROM = process.env.EMAIL_FROM ?? 'BookDigest <noreply@bookdigest.com>'
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3001'
 
@@ -12,6 +10,7 @@ function canSend() {
 
 export async function sendWelcomeEmail(to: string) {
   if (!canSend()) return
+  const resend = new Resend(process.env.RESEND_API_KEY)
   try {
     await resend.emails.send({
       from: FROM,
@@ -26,6 +25,7 @@ export async function sendWelcomeEmail(to: string) {
 
 export async function sendSummaryReadyEmail(to: string, bookTitle: string, style: string, summaryUrl: string) {
   if (!canSend()) return
+  const resend = new Resend(process.env.RESEND_API_KEY)
   try {
     const styleLabels: Record<string, string> = {
       executive: 'Executive Summary',
