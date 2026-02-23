@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase-server'
 import { getSystemPrompt, FREE_LIMIT, type SummaryStyle } from '@/lib/prompts'
 import { sendSummaryReadyEmail } from '@/lib/email'
+import { polyfillDOMMatrix } from '@/lib/dommatrix-polyfill'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -68,13 +69,37 @@ export async function POST(request: Request) {
 
     const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer())
 
+    // Polyfill DOMMatrix for Node.js 18 (pdfjs-dist requires it at module load time)
+    polyfillDOMMatrix()
+
     // Extract text from PDF
     const { PDFParse } = await import('pdf-parse')
     const workerPath = `file://${process.cwd()}/node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs`
     PDFParse.setWorker(workerPath)
     const parser = new PDFParse({ data: pdfBuffer })
     const textResult = await parser.getText()
-    const text = textResult.text.slice(0, MAX_CHARS)
+    const rawText: string = textResult.text
+
+    // Build page-annotated text: prefix each page with "[PAGE N]\n" so Claude
+    // can cite specific pages. pdf-parse uses '\f' (form-feed) as page separator.
+    const pages = rawText.split('\f')
+    let text: string
+    if (pages.length <= 1) {
+      // No page breaks in this PDF — fall back gracefully, Claude skips page fields
+      text = rawText.slice(0, MAX_CHARS)
+    } else {
+      const chunks: string[] = []
+      let total = 0
+      for (let i = 0; i < pages.length; i++) {
+        const pageText = pages[i].trim()
+        if (!pageText) continue
+        const chunk = `[PAGE ${i + 1}]\n${pageText}`
+        if (total + chunk.length > MAX_CHARS) break
+        chunks.push(chunk)
+        total += chunk.length + 2 // +2 for '\n\n' joiner
+      }
+      text = chunks.join('\n\n')
+    }
 
     if (!text.trim()) {
       return NextResponse.json({ error: 'Could not extract text from PDF' }, { status: 400 })

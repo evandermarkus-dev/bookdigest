@@ -60,8 +60,18 @@ function fieldToText(value: unknown): string {
     return (value as unknown[])
       .map(item => {
         if (typeof item === 'object' && item !== null) {
-          const vals = Object.values(item as Record<string, string>)
-          return `- **${vals[0]}**${vals.length > 1 ? ' — ' + vals.slice(1).join(' ') : ''}`
+          const obj = item as Record<string, unknown>
+          const page = typeof obj.page === 'number' ? obj.page : null
+          const { page: _p, ...rest } = obj
+          const entries = Object.entries(rest)
+          // Simple {text, page} format
+          if (entries.length === 1 && 'text' in rest) {
+            return `- ${String(rest.text)}${page !== null ? ` *(p. ${page})*` : ''}`
+          }
+          // Complex object {concept, explanation, page} etc.
+          const vals = entries.map(([, v]) => String(v))
+          const base = `- **${vals[0]}**${vals.length > 1 ? ' — ' + vals.slice(1).join(' ') : ''}`
+          return page !== null ? `${base} *(p. ${page})*` : base
         }
         return `- ${String(item)}`
       })
@@ -117,8 +127,17 @@ function printSummary(summary: Summary, title: string) {
       body += '<ul>'
       for (const item of value as unknown[]) {
         if (typeof item === 'object' && item !== null) {
-          const vals = Object.values(item as Record<string, string>)
-          body += `<li><strong>${vals[0]}</strong>${vals.length > 1 ? ' — ' + vals.slice(1).join(' ') : ''}</li>`
+          const obj = item as Record<string, unknown>
+          const page = typeof obj.page === 'number' ? obj.page : null
+          const { page: _p, ...rest } = obj
+          const entries = Object.entries(rest)
+          const pageTag = page !== null ? ` <span class="page">p.&nbsp;${page}</span>` : ''
+          if (entries.length === 1 && 'text' in rest) {
+            body += `<li>${String(rest.text)}${pageTag}</li>`
+          } else {
+            const vals = entries.map(([, v]) => String(v))
+            body += `<li><strong>${vals[0]}</strong>${vals.length > 1 ? ' — ' + vals.slice(1).join(' ') : ''}${pageTag}</li>`
+          }
         } else {
           body += `<li>${String(item)}</li>`
         }
@@ -135,6 +154,7 @@ function printSummary(summary: Summary, title: string) {
     .subtitle{color:#666;font-size:12px;margin-bottom:32px}
     h2{font-size:14px;font-weight:700;margin-top:28px;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;color:#333;border-bottom:1px solid #eee;padding-bottom:4px}
     ul{margin:0;padding-left:20px}li{margin-bottom:6px}
+    .page{display:inline-block;margin-left:6px;padding:1px 5px;font-size:10px;font-weight:600;border-radius:4px;background:#f5edd8;color:#8a6820;border:1px solid #e8d5a0;white-space:nowrap}
     p{margin:0}@media print{body{margin:20px}}
   </style></head><body>${body}</body></html>`
 
@@ -530,6 +550,18 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
   )
 }
 
+function PageBadge({ page }: { page: number }) {
+  return (
+    <span
+      className="inline-flex items-center ml-2 px-1.5 py-0.5 text-[10px] font-semibold rounded shrink-0 align-middle"
+      style={{ background: 'rgba(201,150,58,0.1)', color: 'var(--app-accent)', border: '1px solid rgba(201,150,58,0.25)' }}
+      title={`Source: page ${page}`}
+    >
+      p.{page}
+    </span>
+  )
+}
+
 function SummaryContent({ summary }: { summary: Summary }) {
   let parsed: Record<string, unknown> | null = null
   try {
@@ -550,27 +582,48 @@ function SummaryContent({ summary }: { summary: Summary }) {
             <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--app-accent)', letterSpacing: '0.08em' }}>{label}</p>
             {Array.isArray(value) ? (
               <ul className="space-y-2">
-                {(value as unknown[]).map((item, i) => (
-                  <li key={i} className="flex gap-2">
-                    <span className="mt-0.5 shrink-0" style={{ color: 'var(--app-accent)' }}>•</span>
-                    <span>
-                      {typeof item === 'object' && item !== null ? (
-                        <span>
-                          {Object.entries(item as Record<string, string>).map(([k, v], j) => (
-                            <span key={k}>
-                              {j > 0 && <span className="text-gray-400"> — </span>}
-                              {j === 0
-                                ? <strong>{v}</strong>
-                                : <span className="prose prose-sm max-w-none"><ReactMarkdown>{v}</ReactMarkdown></span>}
+                {(value as unknown[]).map((item, i) => {
+                  // Extract optional page number (new format), leave rest for display
+                  const isObj = typeof item === 'object' && item !== null
+                  const obj = isObj ? (item as Record<string, unknown>) : null
+                  const page = obj && typeof obj.page === 'number' ? obj.page : null
+                  const { page: _p, ...rest } = obj ?? {}
+                  const restEntries = Object.entries(rest)
+                  const isSimple = restEntries.length === 1 && 'text' in rest
+
+                  return (
+                    <li key={i} className="flex gap-2 items-start">
+                      <span className="mt-0.5 shrink-0" style={{ color: 'var(--app-accent)' }}>•</span>
+                      <span className="flex-1 min-w-0">
+                        {!isObj ? (
+                          // Plain string (old format)
+                          <div className="prose prose-sm max-w-none"><ReactMarkdown>{String(item)}</ReactMarkdown></div>
+                        ) : isSimple ? (
+                          // {text, page} format
+                          <span className="flex items-start flex-wrap gap-x-1">
+                            <div className="prose prose-sm max-w-none inline"><ReactMarkdown>{String(rest.text)}</ReactMarkdown></div>
+                            {page !== null && <PageBadge page={page} />}
+                          </span>
+                        ) : (
+                          // {concept, explanation, page} or similar complex object
+                          <span className="flex items-start flex-wrap gap-x-1">
+                            <span>
+                              {restEntries.map(([k, v], j) => (
+                                <span key={k}>
+                                  {j > 0 && <span className="text-gray-400"> — </span>}
+                                  {j === 0
+                                    ? <strong>{String(v)}</strong>
+                                    : <span className="prose prose-sm max-w-none"><ReactMarkdown>{String(v)}</ReactMarkdown></span>}
+                                </span>
+                              ))}
                             </span>
-                          ))}
-                        </span>
-                      ) : (
-                        <div className="prose prose-sm max-w-none"><ReactMarkdown>{String(item)}</ReactMarkdown></div>
-                      )}
-                    </span>
-                  </li>
-                ))}
+                            {page !== null && <PageBadge page={page} />}
+                          </span>
+                        )}
+                      </span>
+                    </li>
+                  )
+                })}
               </ul>
             ) : (
               <div className="prose prose-sm max-w-none text-gray-700 leading-relaxed">

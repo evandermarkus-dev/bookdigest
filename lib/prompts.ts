@@ -32,6 +32,16 @@ export const LANGUAGES = [
   { code: 'fi', label: 'Suomi' },
 ]
 
+// Page citation instruction appended to all prompts when text has [PAGE N] markers.
+// Claude uses the markers to tie each array item back to a specific page.
+const PAGE_CITATION_INSTRUCTION = `\
+The book text is annotated with [PAGE N] markers that indicate where each new page begins. \
+For every item in an array field, add a "page" field (integer) with the page number where \
+that specific insight, concept, quote, or action appears in the source text. \
+Determine the page by finding which [PAGE N] block the content belongs to. \
+Only include "page" if you can identify it with confidence — omit the field entirely \
+if the content spans many pages or you cannot clearly determine the source page.`
+
 export function getSystemPrompt(style: SummaryStyle, language = 'auto', userContext?: string): string {
   const languageInstruction =
     language === 'auto'
@@ -44,12 +54,15 @@ Structure your response as valid JSON with this exact format:
 {
   "title": "Book title",
   "overview": "2-3 sentence high-level summary",
-  "key_insights": ["insight 1", "insight 2", "insight 3", "insight 4", "insight 5"],
+  "key_insights": [
+    {"text": "insight 1", "page": 42},
+    {"text": "insight 2", "page": 67}
+  ],
   "core_message": "The single most important takeaway in one sentence",
   "relevance": "Why this matters for business leaders"
 }
 
-Be concise, data-driven, and focus on ROI and strategic value. You may use **bold** for key terms within text values. ${languageInstruction}`,
+Be concise, data-driven, and focus on ROI and strategic value. You may use **bold** for key terms within text values. ${PAGE_CITATION_INSTRUCTION} ${languageInstruction}`,
 
     study: `You are an expert educator. Create a comprehensive study guide for this book.
 
@@ -57,13 +70,13 @@ Structure your response as valid JSON with this exact format:
 {
   "title": "Book title",
   "overview": "2-3 sentence summary",
-  "main_concepts": [{"concept": "name", "explanation": "clear explanation"}],
-  "key_chapters": [{"topic": "topic name", "summary": "what was covered"}],
-  "important_quotes": ["quote 1", "quote 2", "quote 3"],
+  "main_concepts": [{"concept": "name", "explanation": "clear explanation", "page": 15}],
+  "key_chapters": [{"topic": "topic name", "summary": "what was covered", "page": 23}],
+  "important_quotes": [{"text": "exact quote from the book", "page": 78}],
   "study_questions": ["question 1", "question 2", "question 3"]
 }
 
-Focus on helping the reader deeply understand and retain the material. You may use **bold** for key terms within text values. ${languageInstruction}`,
+Focus on helping the reader deeply understand and retain the material. You may use **bold** for key terms within text values. ${PAGE_CITATION_INSTRUCTION} ${languageInstruction}`,
 
     action: `You are an expert coach. Extract the most actionable advice from this book.
 
@@ -71,13 +84,13 @@ Structure your response as valid JSON with this exact format:
 {
   "title": "Book title",
   "overview": "2-3 sentence summary",
-  "immediate_actions": ["action 1", "action 2", "action 3"],
-  "weekly_habits": ["habit 1", "habit 2", "habit 3"],
-  "tools_and_frameworks": [{"name": "tool name", "how_to_use": "brief instructions"}],
+  "immediate_actions": [{"text": "action 1", "page": 12}],
+  "weekly_habits": [{"text": "habit 1", "page": 34}],
+  "tools_and_frameworks": [{"name": "tool name", "how_to_use": "brief instructions", "page": 56}],
   "30_day_plan": "A concise 30-day implementation plan"
 }
 
-Focus entirely on practical, immediately applicable steps. You may use **bold** for key terms within text values. ${languageInstruction}`,
+Focus entirely on practical, immediately applicable steps. You may use **bold** for key terms within text values. ${PAGE_CITATION_INSTRUCTION} ${languageInstruction}`,
   }
 
   const contextSection = userContext ? `\n\n${userContext} Tailor the summary accordingly.` : ''
