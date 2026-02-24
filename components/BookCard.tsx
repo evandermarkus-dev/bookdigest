@@ -228,16 +228,29 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
   const [rwHasToken, setRwHasToken] = useState<boolean>(
     typeof window !== 'undefined' && !!localStorage.getItem('bookdigest_readwise_token')
   )
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
+  const [chatInput, setChatInput] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
+  const chatEndRef = useRef<HTMLDivElement>(null)
 
-  // Stop speech when switching tabs or collapsing
+  // Stop speech + reset chat when switching tabs or collapsing
   useEffect(() => {
     if (speaking || paused) {
       window.speechSynthesis?.cancel()
       setSpeaking(false)
       setPaused(false)
     }
+    setChatOpen(false)
+    setChatMessages([])
+    setChatInput('')
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, expanded])
+
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chatMessages, chatLoading])
 
   function handleSpeak() {
     if (!('speechSynthesis' in window)) return
@@ -266,6 +279,34 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
     window.speechSynthesis.cancel()
     setSpeaking(false)
     setPaused(false)
+  }
+
+  async function sendChatMessage(text?: string) {
+    const content = (text ?? chatInput).trim()
+    if (!content) return
+    const summary = summaries[activeTab]
+    if (!summary) return
+    const newMessages = [...chatMessages, { role: 'user' as const, content }]
+    setChatMessages(newMessages)
+    setChatInput('')
+    setChatLoading(true)
+    try {
+      const res = await fetch('/api/chat/summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ summaryId: summary.id, messages: newMessages }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setChatMessages(prev => [...prev, { role: 'assistant', content: data.answer }])
+      } else {
+        setChatMessages(prev => [...prev, { role: 'assistant', content: `Error: ${data.error ?? 'Something went wrong'}` }])
+      }
+    } catch {
+      setChatMessages(prev => [...prev, { role: 'assistant', content: 'Network error — please try again' }])
+    } finally {
+      setChatLoading(false)
+    }
   }
 
   async function doReadwiseExport(summaryId: string) {
@@ -672,6 +713,21 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
                       </>
                     )}
                   </button>
+                  {/* Chat toggle */}
+                  <button
+                    onClick={() => setChatOpen(o => !o)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg transition-colors"
+                    style={chatOpen
+                      ? { color: '#8a6820', borderColor: 'rgba(201,150,58,0.4)', background: 'var(--app-accent-dim)' }
+                      : { color: 'var(--app-muted)', borderColor: 'var(--app-border)' }
+                    }
+                    title="Chat with this summary"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                    Ask
+                  </button>
                 </div>
 
                 {/* Readwise token input (shown on first use) */}
@@ -714,6 +770,81 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
                 )}
 
                 <SummaryContent summary={summaries[activeTab]!} />
+
+                {/* Chat panel */}
+                {chatOpen && (
+                  <div className="mt-5 pt-5" style={{ borderTop: '1px solid var(--app-border)' }}>
+                    {/* Message history */}
+                    {chatMessages.length > 0 && (
+                      <div className="space-y-3 mb-3 max-h-72 overflow-y-auto pr-1">
+                        {chatMessages.map((msg, i) => (
+                          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            <div
+                              className="max-w-[85%] rounded-xl px-3 py-2 text-sm leading-relaxed"
+                              style={msg.role === 'user'
+                                ? { background: 'var(--app-accent)', color: '#1a0f00' }
+                                : { background: 'var(--app-accent-dim)', border: '1px solid rgba(201,150,58,0.2)', color: 'var(--app-text)' }
+                              }
+                            >
+                              {msg.content}
+                            </div>
+                          </div>
+                        ))}
+                        {chatLoading && (
+                          <div className="flex justify-start">
+                            <div className="rounded-xl px-4 py-3" style={{ background: 'var(--app-accent-dim)', border: '1px solid rgba(201,150,58,0.2)' }}>
+                              <div className="flex gap-1 items-center">
+                                <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: 'var(--app-accent)', animationDelay: '0ms' }} />
+                                <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: 'var(--app-accent)', animationDelay: '150ms' }} />
+                                <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: 'var(--app-accent)', animationDelay: '300ms' }} />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        <div ref={chatEndRef} />
+                      </div>
+                    )}
+
+                    {/* Suggested questions (only before first message) */}
+                    {chatMessages.length === 0 && !chatLoading && (
+                      <div className="mb-3 flex flex-wrap gap-2">
+                        {['What are the main takeaways?', 'What action should I take first?', 'Summarize this in one sentence.'].map(q => (
+                          <button
+                            key={q}
+                            onClick={() => sendChatMessage(q)}
+                            className="text-xs px-3 py-1.5 rounded-lg border transition-colors hover:border-[rgba(201,150,58,0.4)]"
+                            style={{ color: 'var(--app-muted)', borderColor: 'var(--app-border)', background: 'var(--app-surface)' }}
+                          >
+                            {q}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Input row */}
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={chatInput}
+                        onChange={e => setChatInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage() } }}
+                        placeholder="Ask a question about this summary…"
+                        disabled={chatLoading}
+                        className="flex-1 text-sm px-3 py-2 rounded-xl focus:outline-none disabled:opacity-50"
+                        style={{ border: '1px solid var(--app-border)', background: 'var(--app-surface)', color: 'var(--app-text)' }}
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => sendChatMessage()}
+                        disabled={!chatInput.trim() || chatLoading}
+                        className="px-4 py-2 text-sm font-medium rounded-xl transition-colors disabled:opacity-40"
+                        style={{ background: 'var(--app-accent)', color: '#1a0f00' }}
+                      >
+                        Send
+                      </button>
+                    </div>
+                  </div>
+                )}
               </>
             ) : (
               <div className="text-center py-10">
