@@ -35,6 +35,75 @@ export const SUMMARY_STYLES: Record<SummaryStyle, { label: string; description: 
   },
 }
 
+// Suggested chat questions — one set per supported language
+export const CHAT_SUGGESTIONS: Record<string, [string, string, string]> = {
+  en: ['What are the main takeaways?', 'What action should I take first?', 'Summarize this in one sentence.'],
+  sv: ['Vad är de viktigaste lärdomarna?', 'Vilken åtgärd bör jag ta först?', 'Sammanfatta detta i en mening.'],
+  de: ['Was sind die wichtigsten Erkenntnisse?', 'Welche Maßnahme sollte ich zuerst ergreifen?', 'Fasse das in einem Satz zusammen.'],
+  fr: ['Quels sont les points essentiels ?', 'Quelle action devrais-je entreprendre en premier ?', 'Résume cela en une phrase.'],
+  es: ['¿Cuáles son las conclusiones principales?', '¿Qué acción debo tomar primero?', 'Resume esto en una oración.'],
+  no: ['Hva er de viktigste lærdomene?', 'Hvilken handling bør jeg ta først?', 'Oppsummer dette i én setning.'],
+  da: ['Hvad er de vigtigste pointer?', 'Hvilken handling bør jeg tage først?', 'Opsummer dette i én sætning.'],
+  fi: ['Mitkä ovat tärkeimmät opit?', 'Mitä toimenpidettä minun pitäisi tehdä ensin?', 'Tiivistä tämä yhdellä lauseella.'],
+}
+
+/**
+ * Detect the language of a summary by extracting text from the content JSON
+ * and matching against language-specific character/word patterns.
+ * Falls back to English when unsure.
+ */
+export function detectLanguageFromContent(content: string): string {
+  // Extract all text values from the summary JSON
+  let text = ''
+  try {
+    const parsed = JSON.parse(content) as Record<string, unknown>
+    const parts: string[] = []
+    for (const val of Object.values(parsed)) {
+      if (typeof val === 'string') {
+        parts.push(val)
+      } else if (Array.isArray(val)) {
+        for (const item of val) {
+          if (typeof item === 'string') parts.push(item)
+          else if (typeof item === 'object' && item !== null) {
+            for (const v of Object.values(item as Record<string, unknown>)) {
+              if (typeof v === 'string') parts.push(v)
+            }
+          }
+        }
+      }
+    }
+    text = parts.join(' ').slice(0, 800)
+  } catch {
+    text = content.slice(0, 800)
+  }
+
+  const t = text.toLowerCase()
+
+  // Finnish — very distinctive morphology (no æ/ø/ä shared with other Nordics)
+  if (/\b(että|kanssa|myös|kuten|ovat|sekä|joka|kaikki|kirja|toiminta|ensimmäinen)\b/.test(t)) return 'fi'
+
+  // German — ß is unique; common German function words
+  if (/ß/.test(t) || /\b(und|ist|das|nicht|auch|wird|sind|einer|einen|beim|durch)\b/.test(t)) return 'de'
+
+  // French — distinctive articles and prepositions
+  if (/\b(les|des|est|une|pour|dans|qui|sur|avec|très|cette|même|être|avoir)\b/.test(t)) return 'fr'
+
+  // Spanish — ñ is unique; common Spanish words
+  if (/ñ/.test(t) || /\b(los|las|del|una|por|con|más|para|también|acción|capítulo)\b/.test(t)) return 'es'
+
+  // Swedish — has ä/ö but NOT æ/ø; distinctive Swedish words
+  if ((/[äö]/.test(t) && !/[æø]/.test(t)) || /\b(och|att|är|för|med|till|som|det|av|på)\b/.test(t)) return 'sv'
+
+  // Norwegian vs Danish (both have æ/ø/å)
+  if (/[æø]/.test(t)) {
+    if (/\b(ikke|gjøre|ønsker|viktig|første|handling|boken|leseren)\b/.test(t)) return 'no'
+    if (/\b(ikke|gøre|ønsker|vigtig|første|handling|bogen|læseren)\b/.test(t)) return 'da'
+    return 'no' // default to Norwegian if can't distinguish
+  }
+
+  return 'en'
+}
+
 export const LANGUAGES = [
   { code: 'auto', label: 'Same as PDF' },
   { code: 'sv', label: 'Svenska' },

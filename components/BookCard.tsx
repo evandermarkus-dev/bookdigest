@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
-import { SUMMARY_STYLES, LANGUAGES, FREE_LIMIT, FIELD_LABELS, buildUserContext, type SummaryStyle } from '@/lib/prompts'
+import { SUMMARY_STYLES, LANGUAGES, FREE_LIMIT, FIELD_LABELS, CHAT_SUGGESTIONS, detectLanguageFromContent, buildUserContext, type SummaryStyle } from '@/lib/prompts'
 import { createClient } from '@/lib/supabase'
 
 const resetDateStr = new Date(
@@ -808,7 +808,7 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
                     {/* Suggested questions (only before first message) */}
                     {chatMessages.length === 0 && !chatLoading && (
                       <div className="mb-3 flex flex-wrap gap-2">
-                        {['What are the main takeaways?', 'What action should I take first?', 'Summarize this in one sentence.'].map(q => (
+                        {(CHAT_SUGGESTIONS[detectLanguageFromContent(summaries[activeTab]!.content)] ?? CHAT_SUGGESTIONS.en).map(q => (
                           <button
                             key={q}
                             onClick={() => sendChatMessage(q)}
