@@ -1,5 +1,20 @@
 export const FREE_LIMIT = 10
 
+export const FIELD_LABELS: Record<string, string> = {
+  overview: 'Overview',
+  key_insights: 'Key Insights',
+  core_message: 'Core Message',
+  relevance: 'Relevance',
+  main_concepts: 'Main Concepts',
+  key_chapters: 'Key Chapters',
+  important_quotes: 'Important Quotes',
+  study_questions: 'Study Questions',
+  immediate_actions: 'Immediate Actions',
+  weekly_habits: 'Weekly Habits',
+  tools_and_frameworks: 'Tools & Frameworks',
+  '30_day_plan': '30-Day Plan',
+}
+
 export type SummaryStyle = 'executive' | 'study' | 'action'
 
 export const SUMMARY_STYLES: Record<SummaryStyle, { label: string; description: string; emoji: string }> = {

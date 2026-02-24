@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
-import { SUMMARY_STYLES, LANGUAGES, FREE_LIMIT, buildUserContext, type SummaryStyle } from '@/lib/prompts'
+import { SUMMARY_STYLES, LANGUAGES, FREE_LIMIT, FIELD_LABELS, buildUserContext, type SummaryStyle } from '@/lib/prompts'
 import { createClient } from '@/lib/supabase'
 
 const resetDateStr = new Date(
@@ -25,20 +25,6 @@ export interface Book {
   summaries: Partial<Record<SummaryStyle, Summary>>
 }
 
-const FIELD_LABELS: Record<string, string> = {
-  overview: 'Overview',
-  key_insights: 'Key Insights',
-  core_message: 'Core Message',
-  relevance: 'Relevance',
-  main_concepts: 'Main Concepts',
-  key_chapters: 'Key Chapters',
-  important_quotes: 'Important Quotes',
-  study_questions: 'Study Questions',
-  immediate_actions: 'Immediate Actions',
-  weekly_habits: 'Weekly Habits',
-  tools_and_frameworks: 'Tools & Frameworks',
-  '30_day_plan': '30-Day Plan',
-}
 
 const STYLES: SummaryStyle[] = ['executive', 'study', 'action']
 
@@ -234,6 +220,14 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
   const [speaking, setSpeaking] = useState(false)
   const [paused, setPaused] = useState(false)
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
+  const [rwExporting, setRwExporting] = useState(false)
+  const [rwExported, setRwExported] = useState<number | null>(null) // highlight count
+  const [rwError, setRwError] = useState<string | null>(null)
+  const [rwShowInput, setRwShowInput] = useState(false)
+  const [rwTokenInput, setRwTokenInput] = useState('')
+  const [rwHasToken, setRwHasToken] = useState<boolean>(
+    typeof window !== 'undefined' && !!localStorage.getItem('bookdigest_readwise_token')
+  )
 
   // Stop speech when switching tabs or collapsing
   useEffect(() => {
@@ -272,6 +266,60 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
     window.speechSynthesis.cancel()
     setSpeaking(false)
     setPaused(false)
+  }
+
+  async function doReadwiseExport(summaryId: string) {
+    setRwExporting(true)
+    setRwError(null)
+    setRwExported(null)
+    try {
+      const res = await fetch('/api/export/readwise', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ summaryId }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setRwExported(data.count)
+        setTimeout(() => setRwExported(null), 4000)
+      } else if (res.status === 401) {
+        localStorage.removeItem('bookdigest_readwise_token')
+        setRwHasToken(false)
+        setRwShowInput(true)
+        setRwError('Token invalid — please re-enter')
+      } else {
+        setRwError(data.error ?? 'Export failed')
+      }
+    } catch {
+      setRwError('Network error')
+    } finally {
+      setRwExporting(false)
+    }
+  }
+
+  async function handleReadwiseExport() {
+    const summary = summaries[activeTab]
+    if (!summary) return
+    if (!rwHasToken) { setRwShowInput(true); return }
+    await doReadwiseExport(summary.id)
+  }
+
+  async function handleReadwiseSaveToken() {
+    if (!rwTokenInput.trim()) return
+    const token = rwTokenInput.trim()
+    const res = await fetch('/api/settings/readwise', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    })
+    if (!res.ok) { setRwError('Could not save token'); return }
+    localStorage.setItem('bookdigest_readwise_token', token)
+    setRwHasToken(true)
+    setRwShowInput(false)
+    setRwTokenInput('')
+    // Export directly — bypass rwHasToken state (not yet reflected in closure)
+    const summary = summaries[activeTab]
+    if (summary) await doReadwiseExport(summary.id)
   }
 
   async function handleShare(style: SummaryStyle) {
@@ -596,7 +644,75 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
                       </button>
                     </div>
                   )}
+                  {/* Readwise export */}
+                  <button
+                    onClick={handleReadwiseExport}
+                    disabled={rwExporting}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg transition-colors disabled:opacity-50"
+                    style={rwExported !== null
+                      ? { color: '#16a34a', borderColor: '#bbf7d0', background: '#f0fdf4' }
+                      : { color: 'var(--app-muted)', borderColor: 'var(--app-border)' }
+                    }
+                    title="Export highlights to Readwise"
+                  >
+                    {rwExported !== null ? (
+                      <>
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                        {rwExported} highlights saved!
+                      </>
+                    ) : rwExporting ? (
+                      <>
+                        <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>
+                        Exporting…
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                        Readwise
+                      </>
+                    )}
+                  </button>
                 </div>
+
+                {/* Readwise token input (shown on first use) */}
+                {rwShowInput && (
+                  <div className="mb-4 p-3 rounded-xl flex flex-col gap-2" style={{ background: 'var(--app-accent-dim)', border: '1px solid rgba(201,150,58,0.25)' }}>
+                    <p className="text-xs font-medium" style={{ color: 'var(--app-text)' }}>
+                      Enter your Readwise Access Token to export highlights.{' '}
+                      <a href="https://readwise.io/access_token" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: 'var(--app-accent)' }}>
+                        Get your token →
+                      </a>
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        type="password"
+                        value={rwTokenInput}
+                        onChange={e => setRwTokenInput(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleReadwiseSaveToken()}
+                        placeholder="Paste token here…"
+                        className="flex-1 text-xs px-3 py-1.5 rounded-lg focus:outline-none"
+                        style={{ border: '1px solid rgba(201,150,58,0.4)', background: 'white', color: 'var(--app-text)' }}
+                        autoFocus
+                      />
+                      <button
+                        onClick={handleReadwiseSaveToken}
+                        disabled={!rwTokenInput.trim()}
+                        className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-40"
+                        style={{ background: 'var(--app-accent)', color: '#1a0f00' }}
+                      >
+                        Save & Export
+                      </button>
+                      <button
+                        onClick={() => { setRwShowInput(false); setRwError(null) }}
+                        className="text-xs px-2 py-1.5 text-gray-400 hover:text-gray-600"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    {rwError && <p className="text-xs text-red-500">{rwError}</p>}
+                  </div>
+                )}
+
                 <SummaryContent summary={summaries[activeTab]!} />
               </>
             ) : (
