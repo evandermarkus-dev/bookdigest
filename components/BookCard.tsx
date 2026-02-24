@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
 import { SUMMARY_STYLES, LANGUAGES, FREE_LIMIT, buildUserContext, type SummaryStyle } from '@/lib/prompts'
@@ -78,6 +78,39 @@ function fieldToText(value: unknown): string {
       .join('\n')
   }
   return String(value)
+}
+
+function summaryToSpeech(summary: Summary, title: string): string {
+  let parsed: Record<string, unknown>
+  try { parsed = JSON.parse(summary.content) } catch { return title }
+
+  const styleInfo = SUMMARY_STYLES[summary.style]
+  const parts: string[] = [`${title}. ${styleInfo.label} summary.`]
+
+  for (const [key, value] of Object.entries(parsed)) {
+    if (key === 'title') continue
+    const label = FIELD_LABELS[key] ?? key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+    parts.push(label + '.')
+
+    if (Array.isArray(value)) {
+      for (const item of value as unknown[]) {
+        if (typeof item === 'string') {
+          parts.push(item.replace(/\*\*/g, '').replace(/\*/g, ''))
+        } else if (typeof item === 'object' && item !== null) {
+          const obj = item as Record<string, unknown>
+          const page = typeof obj.page === 'number' ? obj.page : null
+          const { page: _p, ...rest } = obj
+          const texts = Object.values(rest).map(v => String(v).replace(/\*\*/g, '').replace(/\*/g, ''))
+          const sentence = texts.join('. ')
+          parts.push(page !== null ? `${sentence}. Source: page ${page}.` : sentence)
+        }
+      }
+    } else {
+      parts.push(String(value).replace(/\*\*/g, '').replace(/\*/g, ''))
+    }
+  }
+
+  return parts.join(' ')
 }
 
 function summaryToMarkdown(summary: Summary, title: string): string {
@@ -198,6 +231,48 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
   const [sharing, setSharing] = useState(false)
   const [shareUrls, setShareUrls] = useState<Partial<Record<SummaryStyle, string>>>({})
   const [copiedShare, setCopiedShare] = useState<SummaryStyle | null>(null)
+  const [speaking, setSpeaking] = useState(false)
+  const [paused, setPaused] = useState(false)
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
+
+  // Stop speech when switching tabs or collapsing
+  useEffect(() => {
+    if (speaking || paused) {
+      window.speechSynthesis?.cancel()
+      setSpeaking(false)
+      setPaused(false)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, expanded])
+
+  function handleSpeak() {
+    if (!('speechSynthesis' in window)) return
+    window.speechSynthesis.cancel()
+    const text = summaryToSpeech(summaries[activeTab]!, title)
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.onend = () => { setSpeaking(false); setPaused(false) }
+    utterance.onerror = () => { setSpeaking(false); setPaused(false) }
+    utteranceRef.current = utterance
+    window.speechSynthesis.speak(utterance)
+    setSpeaking(true)
+    setPaused(false)
+  }
+
+  function handlePauseResume() {
+    if (paused) {
+      window.speechSynthesis.resume()
+      setPaused(false)
+    } else {
+      window.speechSynthesis.pause()
+      setPaused(true)
+    }
+  }
+
+  function handleStop() {
+    window.speechSynthesis.cancel()
+    setSpeaking(false)
+    setPaused(false)
+  }
 
   async function handleShare(style: SummaryStyle) {
     const summary = summaries[style]
@@ -479,6 +554,48 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
                       </>
                     )}
                   </button>
+                  {/* Listen / audio controls */}
+                  {!speaking && !paused ? (
+                    <button
+                      onClick={handleSpeak}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg transition-colors"
+                      style={{ color: 'var(--app-muted)', borderColor: 'var(--app-border)' }}
+                      title="Listen to this summary"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072M12 6v12m0 0l-3-3m3 3l3-3M9.172 9.172a4 4 0 000 5.656" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.07 4.929a9 9 0 010 14.142" />
+                      </svg>
+                      Listen
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={handlePauseResume}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg transition-colors"
+                        style={{ color: 'var(--app-accent)', borderColor: 'rgba(201,150,58,0.4)', background: 'var(--app-accent-dim)' }}
+                      >
+                        {paused ? (
+                          <>
+                            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            Resume
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                            Pause
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={handleStop}
+                        className="p-1.5 text-gray-400 hover:text-gray-700 border border-gray-200 rounded-lg transition-colors"
+                        title="Stop"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <SummaryContent summary={summaries[activeTab]!} />
               </>
