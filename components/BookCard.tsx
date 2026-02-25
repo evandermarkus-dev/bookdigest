@@ -575,10 +575,10 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
             {summaries[activeTab] ? (
               <>
                 {/* Export toolbar */}
-                <div className="flex items-center justify-end gap-2 mb-5 flex-wrap">
+                <div className="flex items-center gap-2 mb-5 overflow-x-auto scrollbar-none">
                   <button
                     onClick={() => handleDownload(activeTab)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg transition-colors
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg transition-colors shrink-0
                       text-gray-500 hover:text-gray-800 border-gray-200 hover:border-gray-300
                       data-[done=true]:text-green-600 data-[done=true]:border-green-200"
                     data-done={downloaded === activeTab}
@@ -601,7 +601,7 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
                   </button>
                   <button
                     onClick={() => printSummary(summaries[activeTab]!, title)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 hover:text-gray-800 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 hover:text-gray-800 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors shrink-0"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -611,7 +611,7 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
                   <button
                     onClick={() => handleShare(activeTab)}
                     disabled={sharing}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg transition-colors disabled:opacity-50 shrink-0"
                     style={copiedShare === activeTab
                       ? { color: '#16a34a', borderColor: '#bbf7d0', background: '#f0fdf4' }
                       : shareUrls[activeTab]
@@ -647,7 +647,7 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
                   {!speaking && !paused ? (
                     <button
                       onClick={handleSpeak}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg transition-colors shrink-0"
                       style={{ color: 'var(--app-muted)', borderColor: 'var(--app-border)' }}
                       title="Listen to this summary"
                     >
@@ -658,7 +658,7 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
                       Listen
                     </button>
                   ) : (
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 shrink-0">
                       <button
                         onClick={handlePauseResume}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg transition-colors"
@@ -689,7 +689,7 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
                   <button
                     onClick={handleReadwiseExport}
                     disabled={rwExporting}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg transition-colors disabled:opacity-50 shrink-0"
                     style={rwExported !== null
                       ? { color: '#16a34a', borderColor: '#bbf7d0', background: '#f0fdf4' }
                       : { color: 'var(--app-muted)', borderColor: 'var(--app-border)' }
@@ -716,7 +716,7 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
                   {/* Chat toggle */}
                   <button
                     onClick={() => setChatOpen(o => !o)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg transition-colors shrink-0"
                     style={chatOpen
                       ? { color: '#8a6820', borderColor: 'rgba(201,150,58,0.4)', background: 'var(--app-accent-dim)' }
                       : { color: 'var(--app-muted)', borderColor: 'var(--app-border)' }
