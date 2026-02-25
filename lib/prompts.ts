@@ -1,6 +1,7 @@
 export const FREE_LIMIT = 10
 
 export const FIELD_LABELS: Record<string, string> = {
+  // Book styles
   overview: 'Overview',
   key_insights: 'Key Insights',
   core_message: 'Core Message',
@@ -13,9 +14,16 @@ export const FIELD_LABELS: Record<string, string> = {
   weekly_habits: 'Weekly Habits',
   tools_and_frameworks: 'Tools & Frameworks',
   '30_day_plan': '30-Day Plan',
+  // Research / academic paper style
+  research_question: 'Research Question',
+  methodology: 'Methodology',
+  key_findings: 'Key Findings',
+  limitations: 'Limitations',
+  conclusion: 'Conclusion',
+  key_citations: 'Key Citations',
 }
 
-export type SummaryStyle = 'executive' | 'study' | 'action'
+export type SummaryStyle = 'executive' | 'study' | 'action' | 'research'
 
 export const SUMMARY_STYLES: Record<SummaryStyle, { label: string; description: string; emoji: string }> = {
   executive: {
@@ -33,7 +41,15 @@ export const SUMMARY_STYLES: Record<SummaryStyle, { label: string; description: 
     description: 'Practical steps & implementation',
     emoji: '🚀',
   },
+  research: {
+    label: 'Research',
+    description: 'Academic analysis & key findings',
+    emoji: '🔬',
+  },
 }
+
+/** The three styles shown for regular books (excludes 'research'). */
+export const BOOK_STYLES: SummaryStyle[] = ['executive', 'study', 'action']
 
 // Suggested chat questions — one set per supported language
 export const CHAT_SUGGESTIONS: Record<string, [string, string, string]> = {
@@ -129,7 +145,7 @@ if the content spans many pages or you cannot clearly determine the source page.
 export function getSystemPrompt(style: SummaryStyle, language = 'auto', userContext?: string): string {
   const languageInstruction =
     language === 'auto'
-      ? 'Write your response in the same language as the book.'
+      ? 'Write your response in the same language as the document.'
       : `Write your entire response in ${LANGUAGES.find((l) => l.code === language)?.label ?? language}. This includes all JSON values — the keys must remain in English but all text values must be in the specified language.`
   const prompts: Record<SummaryStyle, string> = {
     executive: `You are an expert business analyst. Summarize the book concisely for a busy executive.
@@ -175,6 +191,25 @@ Structure your response as valid JSON with this exact format:
 }
 
 Focus entirely on practical, immediately applicable steps. You may use **bold** for key terms within text values. ${PAGE_CITATION_INSTRUCTION} ${languageInstruction}`,
+
+    research: `You are an expert research analyst. Analyze this academic paper or research document.
+
+Structure your response as valid JSON with this exact format:
+{
+  "title": "Paper title",
+  "research_question": "The central research question or hypothesis being investigated",
+  "methodology": "Research methods used (e.g. RCT, meta-analysis, survey, qualitative study, literature review)",
+  "key_findings": [
+    {"text": "finding 1", "page": 5},
+    {"text": "finding 2", "page": 8}
+  ],
+  "limitations": "Key limitations the authors acknowledge, or that you identify",
+  "conclusion": "Main conclusion and its broader implications",
+  "relevance": "Who should read this and why it matters",
+  "key_citations": ["Author (Year) — brief description of what was cited and why it matters"]
+}
+
+Be precise and academic. Distinguish clearly between findings and interpretations. Do not add fields that are not in the schema above. ${PAGE_CITATION_INSTRUCTION} ${languageInstruction}`,
   }
 
   const contextSection = userContext ? `\n\n${userContext} Tailor the summary accordingly.` : ''

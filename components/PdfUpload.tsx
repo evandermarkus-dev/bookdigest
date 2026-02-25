@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, DragEvent, ChangeEvent } from 'react'
 import { createClient } from '@/lib/supabase'
-import { SUMMARY_STYLES, LANGUAGES, FREE_LIMIT, buildUserContext, type SummaryStyle, type UserProfile } from '@/lib/prompts'
+import { SUMMARY_STYLES, BOOK_STYLES, LANGUAGES, FREE_LIMIT, buildUserContext, type SummaryStyle, type UserProfile } from '@/lib/prompts'
 
 const MAX_SIZE_MB = 50
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024
@@ -67,6 +67,7 @@ export default function PdfUpload({ summariesThisMonth = 0 }: { summariesThisMon
   }
   const [fileName, setFileName] = useState<string | null>(null)
   const [filePath, setFilePath] = useState<string | null>(null)
+  const [docType, setDocType] = useState<'book' | 'paper'>('book')
   const [selectedStyle, setSelectedStyle] = useState<SummaryStyle>('executive')
   const [selectedLanguage, setSelectedLanguage] = useState('auto')
   const [answers, setAnswers] = useState<Record<QuestionId, string>>({
@@ -343,25 +344,65 @@ export default function PdfUpload({ summariesThisMonth = 0 }: { summariesThisMon
       {state === 'select_style' && (
         <div onClick={(e) => e.stopPropagation()}>
           <h2 className="text-xl font-semibold text-gray-900 mb-1">Choose summary style</h2>
-          <p className="text-sm text-gray-500 mb-6 truncate max-w-xs mx-auto">{fileName}</p>
+          <p className="text-sm text-gray-500 mb-5 truncate max-w-xs mx-auto">{fileName}</p>
 
-          <div className="grid grid-cols-3 gap-3 max-w-lg mx-auto mb-6">
-            {(Object.entries(SUMMARY_STYLES) as [SummaryStyle, typeof SUMMARY_STYLES[SummaryStyle]][]).map(([key, val]) => (
+          {/* Book / Research Paper toggle */}
+          <div className="inline-flex rounded-xl p-1 mb-6" style={{ background: 'var(--app-border)' }}>
+            {(['book', 'paper'] as const).map((type) => (
               <button
-                key={key}
-                onClick={() => setSelectedStyle(key)}
-                className="p-4 rounded-xl border-2 transition-all text-left"
-                style={selectedStyle === key
-                  ? { borderColor: 'var(--app-accent)', background: 'var(--app-accent-dim)' }
-                  : { borderColor: 'var(--app-border)' }
+                key={type}
+                onClick={() => {
+                  setDocType(type)
+                  setSelectedStyle(type === 'paper' ? 'research' : 'executive')
+                }}
+                className="px-4 py-1.5 rounded-lg text-sm font-medium transition-all"
+                style={docType === type
+                  ? { background: 'var(--app-surface)', color: 'var(--app-text)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }
+                  : { color: 'var(--app-muted)' }
                 }
               >
-                <div className="text-2xl mb-1">{val.emoji}</div>
-                <div className="font-medium text-gray-900 text-sm">{val.label}</div>
-                <div className="text-xs text-gray-500">{val.description}</div>
+                {type === 'book' ? '📚 Book' : '🔬 Research Paper'}
               </button>
             ))}
           </div>
+
+          {/* Book: 3 style cards */}
+          {docType === 'book' && (
+            <div className="grid grid-cols-3 gap-3 max-w-lg mx-auto mb-6">
+              {BOOK_STYLES.map((key) => {
+                const val = SUMMARY_STYLES[key]
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setSelectedStyle(key)}
+                    className="p-4 rounded-xl border-2 transition-all text-left"
+                    style={selectedStyle === key
+                      ? { borderColor: 'var(--app-accent)', background: 'var(--app-accent-dim)' }
+                      : { borderColor: 'var(--app-border)' }
+                    }
+                  >
+                    <div className="text-2xl mb-1">{val.emoji}</div>
+                    <div className="font-medium text-gray-900 text-sm">{val.label}</div>
+                    <div className="text-xs text-gray-500">{val.description}</div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Paper: single research card */}
+          {docType === 'paper' && (
+            <div className="max-w-xs mx-auto mb-6">
+              <div
+                className="p-4 rounded-xl border-2 text-left"
+                style={{ borderColor: 'var(--app-accent)', background: 'var(--app-accent-dim)' }}
+              >
+                <div className="text-2xl mb-1">🔬</div>
+                <div className="font-medium text-gray-900 text-sm">Research Analysis</div>
+                <div className="text-xs text-gray-500 mt-1">Research question · Methodology · Key findings · Citations</div>
+              </div>
+            </div>
+          )}
 
           <div className="mb-6">
             <p className="text-sm font-medium text-gray-700 mb-2">Output language:</p>
@@ -387,7 +428,7 @@ export default function PdfUpload({ summariesThisMonth = 0 }: { summariesThisMon
               onClick={handleGenerateSummary}
               className="px-8 py-3 font-medium rounded-xl transition-colors" style={{ background: 'var(--app-accent)', color: '#1a0f00' }}
             >
-              Generate Summary
+              {docType === 'paper' ? 'Analyze Paper' : 'Generate Summary'}
             </button>
           </div>
         </div>

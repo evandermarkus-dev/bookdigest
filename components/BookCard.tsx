@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
-import { SUMMARY_STYLES, LANGUAGES, FREE_LIMIT, FIELD_LABELS, CHAT_SUGGESTIONS, detectLanguageFromContent, buildUserContext, type SummaryStyle } from '@/lib/prompts'
+import { SUMMARY_STYLES, BOOK_STYLES, LANGUAGES, FREE_LIMIT, FIELD_LABELS, CHAT_SUGGESTIONS, detectLanguageFromContent, buildUserContext, type SummaryStyle } from '@/lib/prompts'
 import { createClient } from '@/lib/supabase'
 
 const resetDateStr = new Date(
@@ -26,10 +26,11 @@ export interface Book {
 }
 
 
-const STYLES: SummaryStyle[] = ['executive', 'study', 'action']
+const STYLES: SummaryStyle[] = BOOK_STYLES
 
 function getTitle(summaries: Partial<Record<SummaryStyle, Summary>>, fileName: string): string {
-  for (const style of STYLES) {
+  // Check book styles first, then research as fallback
+  for (const style of [...BOOK_STYLES, 'research' as SummaryStyle]) {
     const s = summaries[style]
     if (s) {
       try {
@@ -188,7 +189,8 @@ function printSummary(summary: Summary, title: string) {
 export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book; summariesThisMonth?: number }) {
   const router = useRouter()
   const supabase = createClient()
-  const firstExisting = STYLES.find(s => book.summaries[s]) ?? 'executive'
+  const firstExisting: SummaryStyle =
+    STYLES.find(s => book.summaries[s]) ?? (book.summaries.research ? 'research' : 'executive')
   const [expanded, setExpanded] = useState(false)
   const [activeTab, setActiveTab] = useState<SummaryStyle>(firstExisting)
   const [generating, setGenerating] = useState<SummaryStyle | null>(null)
@@ -512,8 +514,8 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
         >
           <p className="font-semibold truncate" style={{ color: 'var(--app-text)' }}>{title}</p>
           <p className="text-sm mt-0.5" style={{ color: 'var(--app-muted)' }}>
-            {STYLES.filter(s => summaries[s]).map(s => SUMMARY_STYLES[s].emoji).join(' ')}
-            {' '}{existingCount}/3 styles
+            {[...STYLES.filter(s => summaries[s]).map(s => SUMMARY_STYLES[s].emoji), ...(summaries.research ? ['🔬'] : [])].join(' ')}
+            {' '}{existingCount}/{STYLES.length} styles{summaries.research ? ' · Research' : ''}
           </p>
         </button>
         <div className="flex items-center gap-2 shrink-0">
@@ -568,6 +570,20 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
                 </button>
               )
             })}
+            {/* Research tab — only shown if a research analysis exists */}
+            {summaries.research && (
+              <button
+                onClick={() => setActiveTab('research')}
+                className="flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap shrink-0"
+                style={activeTab === 'research'
+                  ? { background: 'var(--app-accent-dim)', color: '#8a6820', borderBottom: '2px solid var(--app-accent)' }
+                  : { color: 'var(--app-muted)' }
+                }
+              >
+                <span>🔬</span>
+                <span>Research</span>
+              </button>
+            )}
           </div>
 
           {/* Tab content */}
