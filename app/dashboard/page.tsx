@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase-server'
 import PdfUpload from '@/components/PdfUpload'
 import BookCard, { type Book } from '@/components/BookCard'
+import LibrarySearch from '@/components/LibrarySearch'
 import UsageStats from '@/components/UsageStats'
 import { type SummaryStyle } from '@/lib/prompts'
 
@@ -107,53 +108,44 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         {/* Books */}
         <div className="mt-10">
           <h2 className="text-xl font-semibold mb-4" style={{ color: 'var(--app-text)' }}>Your Books</h2>
-          {books.length > 0 ? (
-            <div className="space-y-3">
-              {books.map((book) => (
-                <BookCard key={book.file_path} book={book} summariesThisMonth={summariesThisMonth} />
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--app-surface)', border: '1px solid var(--app-border)' }}>
-              {/* Hero row */}
-              <div className="px-8 pt-10 pb-8 text-center">
-                <div className="text-5xl mb-4">📚</div>
-                <h3 className="text-lg font-semibold mb-2" style={{ fontFamily: 'var(--font-playfair), Georgia, serif', color: 'var(--app-text)' }}>
-                  Your library is empty
-                </h3>
-                <p className="text-sm max-w-sm mx-auto" style={{ color: 'var(--app-muted)' }}>
-                  Upload any PDF book above — BookDigest extracts the key insights and turns them into a structured, readable summary in seconds.
-                </p>
-              </div>
-
-              {/* 3-step guide */}
-              <div className="px-6 pb-10 flex items-start justify-center gap-4 sm:gap-10 flex-wrap">
-                {([
-                  { step: '1', emoji: '📄', label: 'Upload a PDF', desc: 'Any non-fiction book' },
-                  { step: '2', emoji: '✨', label: 'AI summarizes', desc: 'Executive, Study, or Action style' },
-                  { step: '3', emoji: '💡', label: 'Read & explore', desc: 'Chat, export, listen' },
-                ] as const).map(({ step, emoji, label, desc }, i, arr) => (
-                  <div key={step} className="flex items-start gap-3 sm:flex-col sm:items-center sm:gap-2 sm:text-center min-w-[160px] sm:min-w-[100px]">
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0"
-                      style={{ background: 'var(--app-accent-dim)', color: '#8a6820', border: '1px solid rgba(201,150,58,0.35)' }}
-                    >
-                      {step}
+          <LibrarySearch
+            books={books}
+            summariesThisMonth={summariesThisMonth}
+            emptyState={
+              <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--app-surface)', border: '1px solid var(--app-border)' }}>
+                <div className="px-8 pt-10 pb-8 text-center">
+                  <div className="text-5xl mb-4">📚</div>
+                  <h3 className="text-lg font-semibold mb-2" style={{ fontFamily: 'var(--font-playfair), Georgia, serif', color: 'var(--app-text)' }}>
+                    Your library is empty
+                  </h3>
+                  <p className="text-sm max-w-sm mx-auto" style={{ color: 'var(--app-muted)' }}>
+                    Upload any PDF book above — BookDigest extracts the key insights and turns them into a structured, readable summary in seconds.
+                  </p>
+                </div>
+                <div className="px-6 pb-10 flex items-start justify-center gap-4 sm:gap-10 flex-wrap">
+                  {([
+                    { step: '1', emoji: '📄', label: 'Upload a PDF', desc: 'Any non-fiction book' },
+                    { step: '2', emoji: '✨', label: 'AI summarizes', desc: 'Executive, Study, or Action style' },
+                    { step: '3', emoji: '💡', label: 'Read & explore', desc: 'Chat, export, listen' },
+                  ] as const).map(({ step, emoji, label, desc }) => (
+                    <div key={step} className="flex items-start gap-3 sm:flex-col sm:items-center sm:gap-2 sm:text-center min-w-[160px] sm:min-w-[100px]">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0"
+                        style={{ background: 'var(--app-accent-dim)', color: '#8a6820', border: '1px solid rgba(201,150,58,0.35)' }}>
+                        {step}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium" style={{ color: 'var(--app-text)' }}>{emoji} {label}</p>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--app-muted)' }}>{desc}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium" style={{ color: 'var(--app-text)' }}>{emoji} {label}</p>
-                      <p className="text-xs mt-0.5" style={{ color: 'var(--app-muted)' }}>{desc}</p>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+                <div className="px-8 py-3 text-center text-xs" style={{ borderTop: '1px solid var(--app-border)', color: 'var(--app-muted)', background: 'rgba(201,150,58,0.04)' }}>
+                  Works best with non-fiction PDFs — business, self-help, science, and more.
+                </div>
               </div>
-
-              {/* Footer hint */}
-              <div className="px-8 py-3 text-center text-xs" style={{ borderTop: '1px solid var(--app-border)', color: 'var(--app-muted)', background: 'rgba(201,150,58,0.04)' }}>
-                Works best with non-fiction PDFs — business, self-help, science, and more.
-              </div>
-            </div>
-          )}
+            }
+          />
         </div>
       </div>
     </main>
