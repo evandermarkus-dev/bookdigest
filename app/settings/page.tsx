@@ -12,7 +12,7 @@ export default async function SettingsPage() {
 
   const { data: profile } = await supabase
     .from('user_profiles')
-    .select('goal, level, focus, readwise_token')
+    .select('goal, level, focus, readwise_token, tier, stripe_customer_id')
     .eq('user_id', user.id)
     .single()
 
@@ -42,6 +42,8 @@ export default async function SettingsPage() {
           initialLevel={profile?.level ?? 'intermediate'}
           initialFocus={profile?.focus ?? 'practical'}
           initialReadwiseConnected={!!profile?.readwise_token}
+          tier={(profile?.tier as 'free' | 'reader' | 'pro') ?? 'free'}
+          hasStripeCustomer={!!profile?.stripe_customer_id}
         />
       </div>
     </main>

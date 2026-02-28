@@ -19,6 +19,7 @@ export async function GET(request: Request) {
     }
 
     const userId = session.metadata?.supabase_user_id
+    const tier = (session.metadata?.tier as 'reader' | 'pro' | undefined) ?? 'pro'
     const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id
 
     if (userId) {
@@ -26,7 +27,13 @@ export async function GET(request: Request) {
       await supabase
         .from('user_profiles')
         .upsert(
-          { user_id: userId, is_pro: true, stripe_customer_id: customerId ?? null, updated_at: new Date().toISOString() },
+          {
+            user_id: userId,
+            tier,
+            is_pro: tier === 'pro',
+            stripe_customer_id: customerId ?? null,
+            updated_at: new Date().toISOString(),
+          },
           { onConflict: 'user_id' }
         )
     }

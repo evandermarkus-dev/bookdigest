@@ -41,6 +41,8 @@ interface Props {
   initialLevel: string
   initialFocus: string
   initialReadwiseConnected: boolean
+  tier: 'free' | 'reader' | 'pro'
+  hasStripeCustomer: boolean
 }
 
 export default function SettingsClient({
@@ -49,6 +51,8 @@ export default function SettingsClient({
   initialLevel,
   initialFocus,
   initialReadwiseConnected,
+  tier,
+  hasStripeCustomer,
 }: Props) {
   const [goal, setGoal] = useState(initialGoal)
   const [level, setLevel] = useState(initialLevel)
@@ -56,11 +60,26 @@ export default function SettingsClient({
   const [prefSaving, setPrefSaving] = useState(false)
   const [prefSaved, setPrefSaved] = useState(false)
 
+  const [portalLoading, setPortalLoading] = useState(false)
+
   const [rwConnected, setRwConnected] = useState(initialReadwiseConnected)
   const [rwToken, setRwToken] = useState('')
   const [rwSaving, setRwSaving] = useState(false)
   const [rwError, setRwError] = useState<string | null>(null)
   const [rwSaved, setRwSaved] = useState(false)
+
+  async function openPortal() {
+    setPortalLoading(true)
+    try {
+      const res = await fetch('/api/stripe/portal', { method: 'POST' })
+      if (res.ok) {
+        const { url } = await res.json()
+        window.location.href = url
+      }
+    } finally {
+      setPortalLoading(false)
+    }
+  }
 
   async function savePreferences() {
     setPrefSaving(true)
@@ -229,6 +248,64 @@ export default function SettingsClient({
             {rwSaved && <p className="text-xs" style={{ color: '#16a34a' }}>✓ Connected</p>}
           </div>
         )}
+      </section>
+
+      {/* Subscription */}
+      <section className="rounded-2xl p-6" style={{ background: 'var(--app-surface)', border: '1px solid var(--app-border)' }}>
+        <h2 className="font-semibold mb-1" style={{ color: 'var(--app-text)' }}>Subscription</h2>
+        <p className="text-sm mb-4" style={{ color: 'var(--app-muted)' }}>
+          {tier === 'pro' && "You're on BookDigest Pro — unlimited summaries."}
+          {tier === 'reader' && "You're on BookDigest Reader — 30 summaries per month."}
+          {tier === 'free' && "You're on the free plan — 5 summaries per month."}
+        </p>
+
+        <div className="flex items-center gap-3 flex-wrap">
+          {tier === 'pro' && (
+            <span
+              className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-full"
+              style={{ background: 'var(--app-accent)', color: '#1a0f00' }}
+            >
+              ⚡ Pro
+            </span>
+          )}
+          {tier === 'reader' && (
+            <span
+              className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-full"
+              style={{ background: 'var(--app-accent-dim)', color: '#8a6820', border: '1px solid rgba(201,150,58,0.3)' }}
+            >
+              📚 Reader
+            </span>
+          )}
+          {tier === 'free' && (
+            <span
+              className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-full"
+              style={{ background: 'var(--app-border)', color: 'var(--app-muted)' }}
+            >
+              Free
+            </span>
+          )}
+
+          {hasStripeCustomer && (tier === 'pro' || tier === 'reader') && (
+            <button
+              onClick={openPortal}
+              disabled={portalLoading}
+              className="px-4 py-1.5 text-sm font-medium rounded-xl border transition-colors disabled:opacity-50"
+              style={{ color: 'var(--app-text)', borderColor: 'var(--app-border)', background: 'transparent' }}
+            >
+              {portalLoading ? 'Opening…' : 'Manage subscription →'}
+            </button>
+          )}
+
+          {tier === 'free' && (
+            <a
+              href="/pricing"
+              className="px-4 py-1.5 text-sm font-medium rounded-xl transition-colors"
+              style={{ background: 'var(--app-accent)', color: '#1a0f00' }}
+            >
+              Upgrade →
+            </a>
+          )}
+        </div>
       </section>
 
       {/* Account */}
