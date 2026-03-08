@@ -495,8 +495,8 @@ export default function Home() {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem', marginBottom: '2rem' }}>
                 {[
-                  '10 AI summaries per month',
-                  'All 3 summary styles',
+                  '3 AI summaries per month',
+                  'Executive summary style',
                   'Personalization questionnaire',
                   'Markdown & PDF export',
                   'Delete books anytime',
