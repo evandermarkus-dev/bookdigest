@@ -539,7 +539,7 @@ export default function Home() {
               Start Reading Smarter →
             </a>
             <p style={{ marginTop: '1.25rem', fontSize: '0.8125rem', color: 'var(--c-muted)' }}>
-              No credit card · 10 summaries free · Cancel anytime
+              No credit card · 3 summaries free · Cancel anytime
             </p>
           </div>
         </section>
