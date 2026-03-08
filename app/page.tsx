@@ -208,6 +208,7 @@ export default function Home() {
               </span>
             </a>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+              <a href="/books" className="c-nav-link">Books</a>
               <a href="#how" className="c-nav-link">How it works</a>
               <a href="#pricing" className="c-nav-link">Pricing</a>
               <a href="/login" className="c-nav-link">Sign in</a>
@@ -274,7 +275,7 @@ export default function Home() {
 
             {/* Trust line */}
             <p className="c-fade-up c-d4" style={{ fontSize: '0.8125rem', color: 'var(--c-muted)' }}>
-              No credit card required · 10 free summaries/month · Powered by Claude AI
+              No credit card required · 3 free summaries/month · Powered by Claude AI
             </p>
 
             {/* Hero card mockup */}
@@ -555,9 +556,10 @@ export default function Home() {
             <p style={{ fontSize: '0.8125rem', color: 'var(--c-muted)' }}>
               © 2026 BookDigest · Built with Claude AI
             </p>
-            <a href="/login" className="c-nav-link" style={{ fontSize: '0.8125rem' }}>
-              Sign In →
-            </a>
+            <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
+              <a href="/books" className="c-nav-link" style={{ fontSize: '0.8125rem' }}>Books</a>
+              <a href="/login" className="c-nav-link" style={{ fontSize: '0.8125rem' }}>Sign In →</a>
+            </div>
           </div>
         </footer>
       </div>

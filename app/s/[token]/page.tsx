@@ -148,7 +148,7 @@ export default async function SharedSummaryPage({ params }: { params: Promise<{ 
           >
             Start for free →
           </a>
-          <p className="text-indigo-300 text-xs mt-3">No credit card required · 10 free summaries/month</p>
+          <p className="text-indigo-300 text-xs mt-3">No credit card required · 3 free summaries/month</p>
         </div>
       </main>
     </div>

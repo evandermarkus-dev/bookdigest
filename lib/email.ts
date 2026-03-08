@@ -105,7 +105,7 @@ function welcomeHtml() {
     </table>
     ${btn(`${SITE_URL}/dashboard`, 'Go to your dashboard →')}
     <p style="margin:24px 0 0;font-size:13px;color:#aaa;font-family:system-ui,sans-serif;">
-      You have <strong style="color:#555;">10 free summaries</strong> per month. No credit card required.
+      You have <strong style="color:#555;">3 free summaries</strong> per month. No credit card required.
     </p>
   `)
 }
