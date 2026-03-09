@@ -1,4 +1,3 @@
-export const FREE_LIMIT = 10
 
 export const FIELD_LABELS: Record<string, string> = {
   // Book styles
@@ -8,7 +7,7 @@ export const FIELD_LABELS: Record<string, string> = {
   relevance: 'Relevance',
   main_concepts: 'Main Concepts',
   key_chapters: 'Key Chapters',
-  important_quotes: 'Important Quotes',
+  important_quotes: 'Key Ideas',
   study_questions: 'Study Questions',
   immediate_actions: 'Immediate Actions',
   weekly_habits: 'Weekly Habits',
@@ -172,10 +171,11 @@ Structure your response as valid JSON with this exact format:
   "overview": "2-3 sentence summary",
   "main_concepts": [{"concept": "name", "explanation": "clear explanation", "page": 15}],
   "key_chapters": [{"topic": "topic name", "summary": "what was covered", "page": 23}],
-  "important_quotes": [{"text": "exact quote from the book", "page": 78}],
+  "important_quotes": [{"text": "a key idea from this part of the book, expressed entirely in your own words — do NOT reproduce verbatim text from the source", "page": 78}],
   "study_questions": ["question 1", "question 2", "question 3"]
 }
 
+IMPORTANT: The "important_quotes" field must contain paraphrased key ideas, NOT verbatim text copied from the book. Express each idea in your own words while preserving the meaning.
 Focus on helping the reader deeply understand and retain the material. You may use **bold** for key terms within text values. ${PAGE_CITATION_INSTRUCTION} ${languageInstruction}`,
 
     action: `You are an expert coach. Extract the most actionable advice from this book.
@@ -212,7 +212,11 @@ Structure your response as valid JSON with this exact format:
 Be precise and academic. Distinguish clearly between findings and interpretations. Do not add fields that are not in the schema above. ${PAGE_CITATION_INSTRUCTION} ${languageInstruction}`,
   }
 
-  const contextSection = userContext ? `\n\n${userContext} Tailor the summary accordingly.` : ''
+  // Sanitize userContext to prevent prompt injection: cap length and strip control characters
+  const sanitizedContext = userContext
+    ? userContext.slice(0, 500).replace(/[<>{}\[\]\\]/g, '').trim()
+    : ''
+  const contextSection = sanitizedContext ? `\n\n${sanitizedContext} Tailor the summary accordingly.` : ''
   return prompts[style] + contextSection
 }
 
