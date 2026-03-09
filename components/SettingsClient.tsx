@@ -41,6 +41,7 @@ interface Props {
   initialLevel: string
   initialFocus: string
   initialReadwiseConnected: boolean
+  initialNotionConnected: boolean
   tier: 'free' | 'reader' | 'pro'
   hasStripeCustomer: boolean
 }
@@ -51,6 +52,7 @@ export default function SettingsClient({
   initialLevel,
   initialFocus,
   initialReadwiseConnected,
+  initialNotionConnected,
   tier,
   hasStripeCustomer,
 }: Props) {
@@ -62,11 +64,42 @@ export default function SettingsClient({
 
   const [portalLoading, setPortalLoading] = useState(false)
 
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
   const [rwConnected, setRwConnected] = useState(initialReadwiseConnected)
   const [rwToken, setRwToken] = useState('')
   const [rwSaving, setRwSaving] = useState(false)
   const [rwError, setRwError] = useState<string | null>(null)
   const [rwSaved, setRwSaved] = useState(false)
+
+  const [ntConnected, setNtConnected] = useState(initialNotionConnected)
+  const [ntToken, setNtToken] = useState('')
+  const [ntParentUrl, setNtParentUrl] = useState('')
+  const [ntSaving, setNtSaving] = useState(false)
+  const [ntError, setNtError] = useState<string | null>(null)
+  const [ntSaved, setNtSaved] = useState(false)
+
+  async function deleteAccount() {
+    if (deleteConfirmText !== 'DELETE') return
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      const res = await fetch('/api/delete-account', { method: 'DELETE' })
+      if (res.ok) {
+        window.location.href = '/login'
+      } else {
+        const data = await res.json()
+        setDeleteError(data.error ?? 'Failed to delete account')
+      }
+    } catch {
+      setDeleteError('Network error — please try again')
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   async function openPortal() {
     setPortalLoading(true)
@@ -133,6 +166,45 @@ export default function SettingsClient({
       setRwConnected(false)
     } finally {
       setRwSaving(false)
+    }
+  }
+
+  async function saveNotion() {
+    if (!ntToken.trim() || !ntParentUrl.trim()) return
+    setNtSaving(true)
+    setNtError(null)
+    try {
+      const res = await fetch('/api/settings/notion', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: ntToken.trim(), parentUrl: ntParentUrl.trim() }),
+      })
+      if (res.ok) {
+        if (typeof window !== 'undefined') localStorage.setItem('bookdigest_notion_setup', '1')
+        setNtConnected(true)
+        setNtToken('')
+        setNtParentUrl('')
+        setNtSaved(true)
+        setTimeout(() => setNtSaved(false), 3000)
+      } else {
+        const data = await res.json()
+        setNtError(data.error ?? 'Could not connect — check your token and try again')
+      }
+    } catch {
+      setNtError('Network error')
+    } finally {
+      setNtSaving(false)
+    }
+  }
+
+  async function disconnectNotion() {
+    setNtSaving(true)
+    try {
+      await fetch('/api/settings/notion', { method: 'DELETE' })
+      if (typeof window !== 'undefined') localStorage.removeItem('bookdigest_notion_setup')
+      setNtConnected(false)
+    } finally {
+      setNtSaving(false)
     }
   }
 
@@ -250,6 +322,73 @@ export default function SettingsClient({
         )}
       </section>
 
+      {/* Notion */}
+      <section className="rounded-2xl p-6" style={{ background: 'var(--app-surface)', border: '1px solid var(--app-border)' }}>
+        <h2 className="font-semibold mb-1" style={{ color: 'var(--app-text)' }}>Notion integration</h2>
+        <p className="text-sm mb-5" style={{ color: 'var(--app-muted)' }}>
+          Export summaries as structured pages directly to your Notion workspace.
+        </p>
+
+        {ntConnected ? (
+          <div className="flex items-center justify-between gap-4 p-3 rounded-xl" style={{ background: 'rgba(22,163,74,0.06)', border: '1px solid rgba(22,163,74,0.2)' }}>
+            <div className="flex items-center gap-2">
+              <span className="text-green-600 text-sm">●</span>
+              <span className="text-sm font-medium text-green-700">Connected</span>
+            </div>
+            <button
+              onClick={disconnectNotion}
+              disabled={ntSaving}
+              className="text-xs text-red-500 hover:text-red-700 transition-colors disabled:opacity-50"
+            >
+              Disconnect
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={ntToken}
+                onChange={e => setNtToken(e.target.value)}
+                placeholder="Notion Integration Token (secret_…)"
+                className="flex-1 text-sm px-3 py-2 rounded-xl focus:outline-none"
+                style={{ border: '1px solid var(--app-border)', background: 'var(--app-surface)', color: 'var(--app-text)' }}
+              />
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={ntParentUrl}
+                onChange={e => setNtParentUrl(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && saveNotion()}
+                placeholder="Parent page URL (notion.so/…)"
+                className="flex-1 text-sm px-3 py-2 rounded-xl focus:outline-none"
+                style={{ border: '1px solid var(--app-border)', background: 'var(--app-surface)', color: 'var(--app-text)' }}
+              />
+              <button
+                onClick={saveNotion}
+                disabled={!ntToken.trim() || !ntParentUrl.trim() || ntSaving}
+                className="px-4 py-2 text-sm font-medium rounded-xl transition-colors disabled:opacity-40"
+                style={{ background: 'var(--app-accent)', color: '#1a0f00' }}
+              >
+                {ntSaving ? 'Connecting…' : 'Connect'}
+              </button>
+            </div>
+            <a
+              href="https://www.notion.so/profile/integrations"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs underline"
+              style={{ color: 'var(--app-accent)' }}
+            >
+              Create a Notion integration →
+            </a>
+            {ntError && <p className="text-xs text-red-500">{ntError}</p>}
+            {ntSaved && <p className="text-xs" style={{ color: '#16a34a' }}>✓ Connected</p>}
+          </div>
+        )}
+      </section>
+
       {/* Subscription */}
       <section className="rounded-2xl p-6" style={{ background: 'var(--app-surface)', border: '1px solid var(--app-border)' }}>
         <h2 className="font-semibold mb-1" style={{ color: 'var(--app-text)' }}>Subscription</h2>
@@ -321,6 +460,59 @@ export default function SettingsClient({
             Sign out
           </button>
         </form>
+
+        {/* Danger zone */}
+        <div className="mt-6 pt-6" style={{ borderTop: '1px solid var(--app-border)' }}>
+          <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: '#dc2626', letterSpacing: '0.07em' }}>
+            Danger zone
+          </p>
+          {!showDeleteConfirm ? (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="text-sm px-4 py-2 rounded-xl border transition-colors"
+              style={{ color: '#dc2626', borderColor: '#fecaca' }}
+            >
+              Delete account…
+            </button>
+          ) : (
+            <div className="space-y-3 p-4 rounded-xl" style={{ background: 'rgba(220,38,38,0.04)', border: '1px solid #fecaca' }}>
+              <p className="text-sm" style={{ color: 'var(--app-text)' }}>
+                This will <strong>permanently delete</strong> your account, all summaries, uploaded PDFs, and share links. This cannot be undone.
+              </p>
+              <p className="text-sm" style={{ color: 'var(--app-muted)' }}>
+                Type <code className="font-mono font-bold text-red-600">DELETE</code> to confirm:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <input
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={e => setDeleteConfirmText(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && deleteConfirmText === 'DELETE' && deleteAccount()}
+                  placeholder="DELETE"
+                  autoComplete="off"
+                  className="flex-1 min-w-0 text-sm px-3 py-2 rounded-xl focus:outline-none font-mono"
+                  style={{ border: '1px solid #fecaca', background: 'var(--app-surface)', color: 'var(--app-text)' }}
+                />
+                <button
+                  onClick={deleteAccount}
+                  disabled={deleteConfirmText !== 'DELETE' || deleting}
+                  className="px-4 py-2 text-sm font-medium rounded-xl transition-colors disabled:opacity-40 shrink-0"
+                  style={{ background: '#dc2626', color: 'white' }}
+                >
+                  {deleting ? 'Deleting…' : 'Delete account'}
+                </button>
+                <button
+                  onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText('') }}
+                  className="px-3 py-2 text-sm rounded-xl border transition-colors shrink-0"
+                  style={{ color: 'var(--app-muted)', borderColor: 'var(--app-border)' }}
+                >
+                  Cancel
+                </button>
+              </div>
+              {deleteError && <p className="text-xs text-red-500">{deleteError}</p>}
+            </div>
+          )}
+        </div>
       </section>
     </div>
   )
