@@ -16,6 +16,18 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Fetch summary IDs first so we can cascade-delete shared_summaries
+    const { data: summaryRows } = await supabase
+      .from('summaries')
+      .select('id')
+      .eq('file_path', filePath)
+      .eq('user_id', user.id)
+
+    if (summaryRows && summaryRows.length > 0) {
+      const ids = summaryRows.map((s: { id: string }) => s.id)
+      await supabase.from('shared_summaries').delete().in('summary_id', ids)
+    }
+
     // Delete all summaries for this file (RLS ensures user owns them)
     const { error: dbError } = await supabase
       .from('summaries')

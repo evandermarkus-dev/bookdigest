@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
-import { SUMMARY_STYLES, BOOK_STYLES, LANGUAGES, FREE_LIMIT, FIELD_LABELS, CHAT_SUGGESTIONS, detectLanguageFromContent, buildUserContext, type SummaryStyle } from '@/lib/prompts'
+import { SUMMARY_STYLES, BOOK_STYLES, LANGUAGES, FIELD_LABELS, CHAT_SUGGESTIONS, detectLanguageFromContent, buildUserContext, type SummaryStyle } from '@/lib/prompts'
+import { FREE_MONTHLY_LIMIT, READER_MONTHLY_LIMIT, FREE_STYLES, type Tier } from '@/lib/config'
 import { createClient } from '@/lib/supabase'
 
 const resetDateStr = new Date(
@@ -186,7 +187,7 @@ function printSummary(summary: Summary, title: string) {
   win.print()
 }
 
-export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book; summariesThisMonth?: number }) {
+export default function BookCard({ book, summariesThisMonth = 0, tier = 'free' }: { book: Book; summariesThisMonth?: number; tier?: Tier }) {
   const router = useRouter()
   const supabase = createClient()
   const firstExisting: SummaryStyle =
@@ -201,15 +202,21 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
   const [deleting, setDeleting] = useState(false)
 
   const existingCount = STYLES.filter(s => summaries[s]).length
-  const atLimit = summariesThisMonth >= FREE_LIMIT
+  const monthlyLimit = tier === 'pro' ? null : tier === 'reader' ? READER_MONTHLY_LIMIT : FREE_MONTHLY_LIMIT
+  const atLimit = monthlyLimit !== null && summariesThisMonth >= monthlyLimit
+  const upsellTier: 'reader' | 'pro' = tier === 'reader' ? 'pro' : 'reader'
   const title = getTitle(summaries, book.file_name)
   const [downloaded, setDownloaded] = useState<SummaryStyle | null>(null)
   const [upgrading, setUpgrading] = useState(false)
 
-  async function upgradeToStripe() {
+  async function upgradeToStripe(targetTier: 'reader' | 'pro') {
     setUpgrading(true)
     try {
-      const res = await fetch('/api/stripe/checkout', { method: 'POST' })
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier: targetTier }),
+      })
       const data = await res.json()
       if (data.url) window.location.href = data.url
     } catch {
@@ -217,11 +224,16 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
     }
   }
   const [sharing, setSharing] = useState(false)
+  const [revoking, setRevoking] = useState(false)
   const [shareUrls, setShareUrls] = useState<Partial<Record<SummaryStyle, string>>>({})
   const [copiedShare, setCopiedShare] = useState<SummaryStyle | null>(null)
   const [speaking, setSpeaking] = useState(false)
   const [paused, setPaused] = useState(false)
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiAudioUrl, setAiAudioUrl] = useState<string | null>(null)
+  const [aiError, setAiError] = useState<string | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
   const [rwExporting, setRwExporting] = useState(false)
   const [rwExported, setRwExported] = useState<number | null>(null) // highlight count
   const [rwError, setRwError] = useState<string | null>(null)
@@ -230,19 +242,34 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
   const [rwHasToken, setRwHasToken] = useState<boolean>(
     typeof window !== 'undefined' && !!localStorage.getItem('bookdigest_readwise_token')
   )
+  const [ntExporting, setNtExporting] = useState(false)
+  const [ntPageUrl, setNtPageUrl] = useState<string | null>(null)
+  const [ntError, setNtError] = useState<string | null>(null)
+  const [ntShowInput, setNtShowInput] = useState(false)
+  const [ntTokenInput, setNtTokenInput] = useState('')
+  const [ntParentInput, setNtParentInput] = useState('')
+  const [ntHasSetup, setNtHasSetup] = useState<boolean>(
+    typeof window !== 'undefined' && !!localStorage.getItem('bookdigest_notion_setup')
+  )
   const [chatOpen, setChatOpen] = useState(false)
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
   const [chatInput, setChatInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
   const chatEndRef = useRef<HTMLDivElement>(null)
 
-  // Stop speech + reset chat when switching tabs or collapsing
+  // Stop speech + AI audio + reset chat when switching tabs or collapsing
   useEffect(() => {
     if (speaking || paused) {
       window.speechSynthesis?.cancel()
       setSpeaking(false)
       setPaused(false)
     }
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = null
+    }
+    setAiAudioUrl(null)
+    setAiError(null)
     setChatOpen(false)
     setChatMessages([])
     setChatInput('')
@@ -365,6 +392,86 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
     if (summary) await doReadwiseExport(summary.id)
   }
 
+  async function handleAiListen() {
+    const summary = summaries[activeTab]
+    if (!summary) return
+    setAiLoading(true)
+    setAiError(null)
+    try {
+      const res = await fetch(`/api/audio/${summary.id}`)
+      const data = await res.json()
+      if (res.ok) {
+        setAiAudioUrl(data.url)
+      } else if (res.status === 403) {
+        setAiError('upgrade')
+      } else {
+        setAiError(data.error ?? 'Could not generate audio')
+      }
+    } catch {
+      setAiError('Network error')
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
+  async function doNotionExport(summaryId: string) {
+    setNtExporting(true)
+    setNtError(null)
+    setNtPageUrl(null)
+    try {
+      const res = await fetch('/api/export/notion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ summaryId }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setNtPageUrl(data.url)
+        setTimeout(() => setNtPageUrl(null), 8000)
+      } else if (res.status === 401) {
+        localStorage.removeItem('bookdigest_notion_setup')
+        setNtHasSetup(false)
+        setNtShowInput(true)
+        setNtError('Token invalid — please reconnect')
+      } else {
+        setNtError(data.error ?? 'Export failed')
+      }
+    } catch {
+      setNtError('Network error')
+    } finally {
+      setNtExporting(false)
+    }
+  }
+
+  async function handleNotionExport() {
+    const summary = summaries[activeTab]
+    if (!summary) return
+    if (!ntHasSetup) { setNtShowInput(true); return }
+    await doNotionExport(summary.id)
+  }
+
+  async function handleNotionSaveSetup() {
+    if (!ntTokenInput.trim() || !ntParentInput.trim()) return
+    setNtError(null)
+    const res = await fetch('/api/settings/notion', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: ntTokenInput.trim(), parentUrl: ntParentInput.trim() }),
+    })
+    if (!res.ok) {
+      const data = await res.json()
+      setNtError(data.error ?? 'Could not save setup')
+      return
+    }
+    localStorage.setItem('bookdigest_notion_setup', '1')
+    setNtHasSetup(true)
+    setNtShowInput(false)
+    setNtTokenInput('')
+    setNtParentInput('')
+    const summary = summaries[activeTab]
+    if (summary) await doNotionExport(summary.id)
+  }
+
   async function handleShare(style: SummaryStyle) {
     const summary = summaries[style]
     if (!summary) return
@@ -398,6 +505,29 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
       setError('Network error — could not create share link')
     } finally {
       setSharing(false)
+    }
+  }
+
+  async function handleRevoke(style: SummaryStyle) {
+    const summary = summaries[style]
+    if (!summary) return
+    setRevoking(true)
+    try {
+      const res = await fetch(`/api/share?summaryId=${summary.id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setShareUrls(prev => {
+          const next = { ...prev }
+          delete next[style]
+          return next
+        })
+      } else {
+        const data = await res.json()
+        setError(data.error ?? 'Failed to revoke share link')
+      }
+    } catch {
+      setError('Network error — could not revoke share link')
+    } finally {
+      setRevoking(false)
     }
   }
 
@@ -547,6 +677,7 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
               const info = SUMMARY_STYLES[style]
               const exists = !!summaries[style]
               const isGenerating = generating === style
+              const isLocked = tier === 'free' && !(FREE_STYLES as readonly string[]).includes(style)
               return (
                 <button
                   key={style}
@@ -566,7 +697,11 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
                     <span>{info.emoji}</span>
                   )}
                   <span>{info.label}</span>
-                  {!exists && !isGenerating && <span className="text-xs opacity-40">+</span>}
+                  {isLocked && !exists ? (
+                    <span className="text-xs opacity-40">🔒</span>
+                  ) : (!exists && !isGenerating && (
+                    <span className="text-xs opacity-40">+</span>
+                  ))}
                 </button>
               )
             })}
@@ -659,47 +794,82 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
                       </>
                     )}
                   </button>
-                  {/* Listen / audio controls */}
-                  {!speaking && !paused ? (
+                  {/* Revoke share link — only shown when this style has an active share */}
+                  {shareUrls[activeTab] && (
                     <button
-                      onClick={handleSpeak}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg transition-colors shrink-0"
-                      style={{ color: 'var(--app-muted)', borderColor: 'var(--app-border)' }}
-                      title="Listen to this summary"
+                      onClick={() => handleRevoke(activeTab)}
+                      disabled={revoking}
+                      title="Revoke share link"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg transition-colors disabled:opacity-50 shrink-0"
+                      style={{ color: '#dc2626', borderColor: '#fecaca' }}
                     >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072M12 6v12m0 0l-3-3m3 3l3-3M9.172 9.172a4 4 0 000 5.656" />
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.07 4.929a9 9 0 010 14.142" />
-                      </svg>
-                      Listen
+                      {revoking ? (
+                        <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                        </svg>
+                      ) : (
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                        </svg>
+                      )}
+                      Revoke
                     </button>
+                  )}
+                  {/* Listen / audio controls */}
+                  {tier === 'free' ? (
+                    /* Free: browser TTS */
+                    !speaking && !paused ? (
+                      <button
+                        onClick={handleSpeak}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg transition-colors shrink-0"
+                        style={{ color: 'var(--app-muted)', borderColor: 'var(--app-border)' }}
+                        title="Listen to this summary"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072M12 6v12m0 0l-3-3m3 3l3-3M9.172 9.172a4 4 0 000 5.656" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19.07 4.929a9 9 0 010 14.142" />
+                        </svg>
+                        Listen
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={handlePauseResume}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg transition-colors"
+                          style={{ color: 'var(--app-accent)', borderColor: 'rgba(201,150,58,0.4)', background: 'var(--app-accent-dim)' }}
+                        >
+                          {paused ? (
+                            <><svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>Resume</>
+                          ) : (
+                            <><svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>Pause</>
+                          )}
+                        </button>
+                        <button onClick={handleStop} className="p-1.5 text-gray-400 hover:text-gray-700 border border-gray-200 rounded-lg transition-colors" title="Stop">
+                          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+                        </button>
+                      </div>
+                    )
                   ) : (
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        onClick={handlePauseResume}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg transition-colors"
-                        style={{ color: 'var(--app-accent)', borderColor: 'rgba(201,150,58,0.4)', background: 'var(--app-accent-dim)' }}
-                      >
-                        {paused ? (
-                          <>
-                            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                            Resume
-                          </>
-                        ) : (
-                          <>
-                            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-                            Pause
-                          </>
-                        )}
-                      </button>
-                      <button
-                        onClick={handleStop}
-                        className="p-1.5 text-gray-400 hover:text-gray-700 border border-gray-200 rounded-lg transition-colors"
-                        title="Stop"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
-                      </button>
-                    </div>
+                    /* Reader / Pro: AI audio */
+                    <button
+                      onClick={handleAiListen}
+                      disabled={aiLoading}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg transition-colors disabled:opacity-50 shrink-0"
+                      style={aiAudioUrl
+                        ? { color: 'var(--app-accent)', borderColor: 'rgba(201,150,58,0.4)', background: 'var(--app-accent-dim)' }
+                        : { color: 'var(--app-muted)', borderColor: 'var(--app-border)' }
+                      }
+                      title="AI-generated audio narration"
+                    >
+                      {aiLoading ? (
+                        <><svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>Generating…</>
+                      ) : aiAudioUrl ? (
+                        <><svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>Play again</>
+                      ) : (
+                        <><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}><path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072M12 6v12m0 0l-3-3m3 3l3-3M9.172 9.172a4 4 0 000 5.656"/><path strokeLinecap="round" strokeLinejoin="round" d="M19.07 4.929a9 9 0 010 14.142"/></svg>AI Listen</>
+                      )}
+                    </button>
                   )}
                   {/* Readwise export */}
                   <button
@@ -726,6 +896,36 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
                       <>
                         <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
                         Readwise
+                      </>
+                    )}
+                  </button>
+                  {/* Notion export */}
+                  <button
+                    onClick={handleNotionExport}
+                    disabled={ntExporting}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg transition-colors disabled:opacity-50 shrink-0"
+                    style={ntPageUrl !== null
+                      ? { color: '#16a34a', borderColor: '#bbf7d0', background: '#f0fdf4' }
+                      : { color: 'var(--app-muted)', borderColor: 'var(--app-border)' }
+                    }
+                    title="Export to Notion"
+                  >
+                    {ntPageUrl !== null ? (
+                      <>
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                        <a href={ntPageUrl} target="_blank" rel="noopener noreferrer" className="underline">
+                          Notion page →
+                        </a>
+                      </>
+                    ) : ntExporting ? (
+                      <>
+                        <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>
+                        Exporting…
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M4.459 4.208c.746.606 1.026.56 2.428.466l13.215-.793c.28 0 .047-.28-.046-.326L17.86 1.968c-.42-.326-.981-.7-2.055-.607L3.01 2.295c-.466.046-.56.28-.374.466zm.793 3.08v13.904c0 .747.373 1.027 1.214.98l14.523-.84c.841-.046.935-.56.935-1.167V6.354c0-.606-.233-.933-.748-.887l-15.177.887c-.56.047-.747.327-.747.933zm14.337.745c.093.42 0 .84-.42.888l-.7.14v10.264c-.608.327-1.168.514-1.635.514-.748 0-.935-.234-1.495-.933l-4.577-7.186v6.952L12.21 19s0 .84-1.168.84l-3.222.186c-.093-.186 0-.653.327-.746l.84-.233V9.854L7.822 9.76c-.094-.42.14-1.026.793-1.073l3.456-.233 4.764 7.279v-6.44l-1.215-.14c-.093-.514.28-.887.747-.933zM1.936 1.035l13.31-.98c1.634-.14 2.055-.047 3.082.7l4.249 2.986c.7.513.934.653.934 1.213v16.378c0 1.026-.373 1.634-1.68 1.726l-15.458.934c-.98.047-1.448-.093-1.962-.747l-3.129-4.06c-.56-.747-.793-1.306-.793-1.96V2.667c0-.839.374-1.54 1.447-1.632z"/></svg>
+                        Notion
                       </>
                     )}
                   </button>
@@ -783,6 +983,68 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
                     </div>
                     {rwError && <p className="text-xs text-red-500">{rwError}</p>}
                   </div>
+                )}
+
+                {/* Notion setup (shown on first use) */}
+                {ntShowInput && (
+                  <div className="mb-4 p-3 rounded-xl flex flex-col gap-2" style={{ background: 'var(--app-accent-dim)', border: '1px solid rgba(201,150,58,0.25)' }}>
+                    <p className="text-xs font-medium" style={{ color: 'var(--app-text)' }}>
+                      Connect Notion to export this summary as a page.{' '}
+                      <a href="https://www.notion.so/profile/integrations" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: 'var(--app-accent)' }}>
+                        Create integration →
+                      </a>
+                    </p>
+                    <input
+                      type="password"
+                      value={ntTokenInput}
+                      onChange={e => setNtTokenInput(e.target.value)}
+                      placeholder="Integration token (secret_…)"
+                      className="text-xs px-3 py-1.5 rounded-lg focus:outline-none"
+                      style={{ border: '1px solid rgba(201,150,58,0.4)', background: 'white', color: 'var(--app-text)' }}
+                      autoFocus
+                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={ntParentInput}
+                        onChange={e => setNtParentInput(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleNotionSaveSetup()}
+                        placeholder="Parent page URL (notion.so/…)"
+                        className="flex-1 text-xs px-3 py-1.5 rounded-lg focus:outline-none"
+                        style={{ border: '1px solid rgba(201,150,58,0.4)', background: 'white', color: 'var(--app-text)' }}
+                      />
+                      <button
+                        onClick={handleNotionSaveSetup}
+                        disabled={!ntTokenInput.trim() || !ntParentInput.trim()}
+                        className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-40"
+                        style={{ background: 'var(--app-accent)', color: '#1a0f00' }}
+                      >
+                        Save & Export
+                      </button>
+                      <button
+                        onClick={() => { setNtShowInput(false); setNtError(null) }}
+                        className="text-xs px-2 py-1.5 text-gray-400 hover:text-gray-600"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    {ntError && <p className="text-xs text-red-500">{ntError}</p>}
+                  </div>
+                )}
+
+                {/* AI audio player */}
+                {aiAudioUrl && (
+                  <audio
+                    ref={audioRef}
+                    key={aiAudioUrl}
+                    src={aiAudioUrl}
+                    controls
+                    autoPlay
+                    className="w-full mb-4 rounded-lg"
+                  />
+                )}
+                {aiError && aiError !== 'upgrade' && (
+                  <p className="text-xs text-red-500 mb-3">{aiError}</p>
                 )}
 
                 <SummaryContent summary={summaries[activeTab]!} />
@@ -867,59 +1129,95 @@ export default function BookCard({ book, summariesThisMonth = 0 }: { book: Book;
                 <div className="text-4xl mb-3">{SUMMARY_STYLES[activeTab].emoji}</div>
                 <p className="text-gray-500 mb-1 font-medium">{SUMMARY_STYLES[activeTab].label} summary</p>
                 <p className="text-sm text-gray-400 mb-6">{SUMMARY_STYLES[activeTab].description}</p>
-                {atLimit ? (
-                  <div className="inline-block rounded-2xl p-5 max-w-xs text-left" style={{ background: 'var(--app-accent-dim)', border: '1px solid rgba(201,150,58,0.25)' }}>
-                    <p className="text-2xl mb-2">⚡</p>
-                    <p className="font-semibold mb-1" style={{ color: 'var(--app-text)' }}>Upgrade to Pro</p>
-                    <p className="text-sm mb-3" style={{ color: 'var(--app-muted)' }}>
-                      You&apos;ve used {FREE_LIMIT}/{FREE_LIMIT} summaries this month.
-                    </p>
-                    <ul className="space-y-1 mb-4">
-                      {['Unlimited summaries', 'Priority processing', 'Advanced exports'].map(f => (
-                        <li key={f} className="text-sm flex items-center gap-1.5" style={{ color: '#8a6820' }}>
-                          <span className="font-bold" style={{ color: 'var(--app-accent)' }}>✓</span> {f}
-                        </li>
-                      ))}
-                    </ul>
-                    <button
-                      onClick={upgradeToStripe}
-                      disabled={upgrading}
-                      className="w-full px-4 py-2 text-sm font-semibold rounded-xl transition-colors disabled:opacity-60" style={{ background: 'var(--app-accent)', color: '#1a0f00' }}
-                    >
-                      {upgrading ? 'Redirecting…' : 'Upgrade to Pro →'}
-                    </button>
-                    <p className="text-xs text-gray-400 mt-2 text-center">Resets {resetDateStr}</p>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center gap-3 flex-wrap">
-                    <select
-                      value={language}
-                      onChange={e => setLanguage(e.target.value)}
-                      className="px-3 py-2 rounded-xl text-sm focus:outline-none" style={{ border: '1px solid var(--app-border)', color: 'var(--app-text)', background: 'var(--app-surface)' }}
-                    >
-                      {LANGUAGES.map(lang => (
-                        <option key={lang.code} value={lang.code}>{lang.label}</option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={() => generate(activeTab)}
-                      disabled={!!generating}
-                      className="flex items-center gap-2 px-6 py-2 font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed" style={{ background: 'var(--app-accent)', color: '#1a0f00' }}
-                    >
-                      {generating === activeTab ? (
-                        <>
-                          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                          </svg>
-                          Generating…
-                        </>
-                      ) : (
-                        `Generate ${SUMMARY_STYLES[activeTab].label}`
-                      )}
-                    </button>
-                  </div>
-                )}
+                {(() => {
+                  const isStyleLocked = tier === 'free' && !(FREE_STYLES as readonly string[]).includes(activeTab as string)
+                  if (isStyleLocked) {
+                    return (
+                      <div className="inline-block rounded-2xl p-5 max-w-xs text-left" style={{ background: 'var(--app-accent-dim)', border: '1px solid rgba(201,150,58,0.25)' }}>
+                        <p className="text-2xl mb-2">📚</p>
+                        <p className="font-semibold mb-1" style={{ color: 'var(--app-text)' }}>Unlock with Reader</p>
+                        <p className="text-sm mb-3" style={{ color: 'var(--app-muted)' }}>
+                          Study and Action summaries are available on Reader and Pro plans.
+                        </p>
+                        <ul className="space-y-1 mb-4">
+                          {['Study & Action styles', '20 summaries/month', 'All export formats'].map(f => (
+                            <li key={f} className="text-sm flex items-center gap-1.5" style={{ color: '#8a6820' }}>
+                              <span className="font-bold" style={{ color: 'var(--app-accent)' }}>✓</span> {f}
+                            </li>
+                          ))}
+                        </ul>
+                        <button
+                          onClick={() => upgradeToStripe('reader')}
+                          disabled={upgrading}
+                          className="w-full px-4 py-2 text-sm font-semibold rounded-xl transition-colors disabled:opacity-60" style={{ background: 'var(--app-accent)', color: '#1a0f00' }}
+                        >
+                          {upgrading ? 'Redirecting…' : 'Upgrade to Reader →'}
+                        </button>
+                      </div>
+                    )
+                  }
+                  if (atLimit) {
+                    return (
+                      <div className="inline-block rounded-2xl p-5 max-w-xs text-left" style={{ background: 'var(--app-accent-dim)', border: '1px solid rgba(201,150,58,0.25)' }}>
+                        <p className="text-2xl mb-2">{upsellTier === 'pro' ? '⚡' : '📚'}</p>
+                        <p className="font-semibold mb-1" style={{ color: 'var(--app-text)' }}>
+                          {upsellTier === 'pro' ? 'Upgrade to Pro' : 'Upgrade to Reader'}
+                        </p>
+                        <p className="text-sm mb-3" style={{ color: 'var(--app-muted)' }}>
+                          You&apos;ve used {summariesThisMonth}/{monthlyLimit} summaries this month.
+                        </p>
+                        <ul className="space-y-1 mb-4">
+                          {(upsellTier === 'pro'
+                            ? ['Unlimited summaries', 'Priority processing', 'Advanced exports']
+                            : ['20 summaries/month', 'Study & Action styles', 'All export formats']
+                          ).map(f => (
+                            <li key={f} className="text-sm flex items-center gap-1.5" style={{ color: '#8a6820' }}>
+                              <span className="font-bold" style={{ color: 'var(--app-accent)' }}>✓</span> {f}
+                            </li>
+                          ))}
+                        </ul>
+                        <button
+                          onClick={() => upgradeToStripe(upsellTier)}
+                          disabled={upgrading}
+                          className="w-full px-4 py-2 text-sm font-semibold rounded-xl transition-colors disabled:opacity-60" style={{ background: 'var(--app-accent)', color: '#1a0f00' }}
+                        >
+                          {upgrading ? 'Redirecting…' : `Upgrade to ${upsellTier === 'pro' ? 'Pro' : 'Reader'} →`}
+                        </button>
+                        <p className="text-xs text-gray-400 mt-2 text-center">Resets {resetDateStr}</p>
+                      </div>
+                    )
+                  }
+                  return (
+                    <div className="flex items-center justify-center gap-3 flex-wrap">
+                      <select
+                        value={language}
+                        onChange={e => setLanguage(e.target.value)}
+                        className="px-3 py-2 rounded-xl text-sm focus:outline-none" style={{ border: '1px solid var(--app-border)', color: 'var(--app-text)', background: 'var(--app-surface)' }}
+                      >
+                        {LANGUAGES.map(lang => (
+                          <option key={lang.code} value={lang.code}>{lang.label}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => generate(activeTab)}
+                        disabled={!!generating}
+                        className="flex items-center gap-2 px-6 py-2 font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed" style={{ background: 'var(--app-accent)', color: '#1a0f00' }}
+                      >
+                        {generating === activeTab ? (
+                          <>
+                            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                            </svg>
+                            Generating…
+                          </>
+                        ) : (
+                          `Generate ${SUMMARY_STYLES[activeTab].label}`
+                        )}
+                      </button>
+                    </div>
+                  )
+                })()}
                 {error && <p className="text-red-500 text-sm mt-3">{error}</p>}
               </div>
             )}
