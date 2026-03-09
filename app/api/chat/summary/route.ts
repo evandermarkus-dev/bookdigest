@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase-server'
 import { SUMMARY_STYLES, FIELD_LABELS, type SummaryStyle } from '@/lib/prompts'
+import { checkRateLimit } from '@/lib/ratelimit'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -47,6 +48,9 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const rlResponse = await checkRateLimit('chat', user.id)
+  if (rlResponse) return rlResponse
+
   const { summaryId, messages } = await request.json() as {
     summaryId: string
     messages: ChatMessage[]
@@ -74,6 +78,9 @@ export async function POST(request: Request) {
 
   const context = summaryToContext(summary.content, summary.style, title)
 
+  // Trim to last 20 messages to stay within context limits for long sessions
+  const trimmedMessages = messages.slice(-20)
+
   const response = await anthropic.messages.create({
     model: 'claude-haiku-4-5',
     max_tokens: 600,
@@ -84,7 +91,7 @@ Here is the summary:
 ${context}
 
 Answer questions concisely based on this summary. If asked about something not covered, say so and mention what is covered. Don't repeat large chunks of the summary verbatim — synthesize and explain. Keep answers under 200 words unless the user asks for detail.`,
-    messages: messages.map(m => ({ role: m.role, content: m.content })),
+    messages: trimmedMessages.map(m => ({ role: m.role, content: m.content })),
   })
 
   const answer = response.content[0].type === 'text' ? response.content[0].text : ''

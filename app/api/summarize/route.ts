@@ -1,15 +1,21 @@
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase-server'
-import { getSystemPrompt, FREE_LIMIT, type SummaryStyle } from '@/lib/prompts'
+import { getSystemPrompt, type SummaryStyle } from '@/lib/prompts'
+import { MAX_PDF_CHARS, RATE_LIMIT_COUNT, RATE_LIMIT_WINDOW_MS, SIGNED_URL_TTL_SECONDS, FREE_STYLES, tierMonthlyLimit, type Tier } from '@/lib/config'
 import { sendSummaryReadyEmail } from '@/lib/email'
 import { polyfillDOMMatrix } from '@/lib/dommatrix-polyfill'
+import { checkRateLimit } from '@/lib/ratelimit'
+
+if (!process.env.ANTHROPIC_API_KEY) {
+  throw new Error('ANTHROPIC_API_KEY is required')
+}
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
-const MAX_CHARS = 80000
+const MAX_CHARS = MAX_PDF_CHARS
 
 export async function POST(request: Request) {
   try {
@@ -32,31 +38,59 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check Pro status and monthly usage limit
+    // Verify the requested file belongs to this user (filePath must start with their user ID)
+    if (!filePath.startsWith(`${user.id}/`)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    // Redis rate limit: fast atomic check before any expensive work
+    const rlResponse = await checkRateLimit('summarize', user.id)
+    if (rlResponse) return rlResponse
+
+    // Fetch user profile for tier + streak tracking
     const { data: userProfile } = await supabase
       .from('user_profiles')
-      .select('is_pro, streak_count, longest_streak, last_summary_date')
+      .select('tier, streak_count, longest_streak, last_summary_date')
       .eq('user_id', user.id)
       .single()
 
-    const isPro = userProfile?.is_pro ?? false
+    const tier = ((userProfile?.tier as Tier) ?? 'free')
 
-    if (!isPro) {
+    // Enforce style restriction on Free tier
+    if (tier === 'free' && !(FREE_STYLES as readonly string[]).includes(style)) {
+      return NextResponse.json({ error: 'Upgrade to access this summary style.' }, { status: 403 })
+    }
+
+    // Enforce monthly usage limit (Pro = unlimited)
+    const monthlyLimit = tierMonthlyLimit(tier)
+    if (monthlyLimit !== null) {
       const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
       const { count } = await supabase
         .from('summaries')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .gte('created_at', startOfMonth)
-      if ((count ?? 0) >= FREE_LIMIT) {
+      if ((count ?? 0) >= monthlyLimit) {
         return NextResponse.json({ error: 'Monthly limit reached. Upgrade to continue.' }, { status: 429 })
       }
+    }
+
+    // Rate limit: max RATE_LIMIT_COUNT summaries per RATE_LIMIT_WINDOW_MS per user
+    // Note: DB-based check is best-effort — not atomic. Sufficient for sustained abuse prevention.
+    const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_MS).toISOString()
+    const { count: recentCount } = await supabase
+      .from('summaries')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .gte('created_at', windowStart)
+    if ((recentCount ?? 0) >= RATE_LIMIT_COUNT) {
+      return NextResponse.json({ error: 'Too many requests. Please wait a few minutes.' }, { status: 429 })
     }
 
     // Create signed URL and download PDF
     const { data: signedData, error: signedError } = await supabase.storage
       .from('Books')
-      .createSignedUrl(filePath, 60)
+      .createSignedUrl(filePath, SIGNED_URL_TTL_SECONDS)
 
     if (signedError || !signedData) {
       return NextResponse.json({ error: 'Could not access file' }, { status: 400 })
@@ -162,10 +196,12 @@ export async function POST(request: Request) {
         { onConflict: 'user_id' }
       )
 
-    // Send "summary ready" email (fire-and-forget)
+    // Send "summary ready" email (fire-and-forget — errors are logged but don't fail the request)
     if (user.email) {
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3001'
-      sendSummaryReadyEmail(user.email, fileName, style, `${siteUrl}/dashboard`)
+      sendSummaryReadyEmail(user.email, fileName, style, `${siteUrl}/dashboard`).catch((err) => {
+        console.error('[email] Failed to send summary ready email:', err)
+      })
     }
 
     return NextResponse.json({ summary })
