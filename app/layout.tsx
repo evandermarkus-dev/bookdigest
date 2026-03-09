@@ -22,7 +22,7 @@ const playfair = Playfair_Display({
   weight: ["400", "700", "900"],
 });
 
-const SITE_URL = 'https://bookdigest.com'
+const SITE_URL = 'https://bookdigest.se'
 const SITE_NAME = 'BookDigest'
 const SITE_DESCRIPTION =
   'Upload any non-fiction PDF and get a personalized AI summary in minutes — executive briefing, deep-study notes, or an action plan tailored to your goals.'
