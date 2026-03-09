@@ -558,6 +558,8 @@ export default function Home() {
             </p>
             <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
               <a href="/books" className="c-nav-link" style={{ fontSize: '0.8125rem' }}>Books</a>
+              <a href="/tos" className="c-nav-link" style={{ fontSize: '0.8125rem' }}>Användarvillkor</a>
+              <a href="/privacy" className="c-nav-link" style={{ fontSize: '0.8125rem' }}>Integritetspolicy</a>
               <a href="/login" className="c-nav-link" style={{ fontSize: '0.8125rem' }}>Sign In →</a>
             </div>
           </div>
