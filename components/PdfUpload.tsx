@@ -2,10 +2,12 @@
 
 import { useState, useRef, useEffect, DragEvent, ChangeEvent } from 'react'
 import { createClient } from '@/lib/supabase'
-import { SUMMARY_STYLES, BOOK_STYLES, LANGUAGES, FREE_LIMIT, buildUserContext, type SummaryStyle, type UserProfile } from '@/lib/prompts'
+import { SUMMARY_STYLES, BOOK_STYLES, LANGUAGES, buildUserContext, type SummaryStyle, type UserProfile } from '@/lib/prompts'
+import { MAX_PDF_SIZE_BYTES, FREE_MONTHLY_LIMIT, READER_MONTHLY_LIMIT, FREE_STYLES, type Tier } from '@/lib/config'
+import { analytics } from '@/lib/analytics'
 
-const MAX_SIZE_MB = 50
-const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024
+const MAX_SIZE_MB = MAX_PDF_SIZE_BYTES / (1024 * 1024)
+const MAX_SIZE_BYTES = MAX_PDF_SIZE_BYTES
 
 type UploadState = 'idle' | 'dragging' | 'uploading' | 'questionnaire' | 'select_style' | 'summarizing' | 'error'
 
@@ -48,17 +50,24 @@ const resetDateStr = new Date(
   new Date().getFullYear(), new Date().getMonth() + 1, 1
 ).toLocaleDateString('en', { month: 'long', day: 'numeric' })
 
-export default function PdfUpload({ summariesThisMonth = 0 }: { summariesThisMonth?: number }) {
-  const atLimit = summariesThisMonth >= FREE_LIMIT
+export default function PdfUpload({ summariesThisMonth = 0, tier = 'free' }: { summariesThisMonth?: number; tier?: Tier }) {
+  const monthlyLimit = tier === 'pro' ? null : tier === 'reader' ? READER_MONTHLY_LIMIT : FREE_MONTHLY_LIMIT
+  const atLimit = monthlyLimit !== null && summariesThisMonth >= monthlyLimit
+  // Free users upgrading from limit → Reader is the right next step; Reader → Pro
+  const upsellTier: 'reader' | 'pro' = tier === 'reader' ? 'pro' : 'reader'
   const [state, setState] = useState<UploadState>('idle')
   const [error, setError] = useState<string | null>(null)
   const [upgrading, setUpgrading] = useState(false)
 
-  async function upgradeToStripe(e: React.MouseEvent) {
-    e.stopPropagation()
+  async function handleUpgrade(targetTier: 'reader' | 'pro') {
     setUpgrading(true)
+    analytics.upgrade(targetTier)
     try {
-      const res = await fetch('/api/stripe/checkout', { method: 'POST' })
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier: targetTier }),
+      })
       const data = await res.json()
       if (data.url) window.location.href = data.url
     } catch {
@@ -132,6 +141,7 @@ export default function PdfUpload({ summariesThisMonth = 0 }: { summariesThisMon
       return
     }
 
+    analytics.pdfUploaded()
     setFilePath(path)
     setState('questionnaire')
   }
@@ -179,6 +189,7 @@ export default function PdfUpload({ summariesThisMonth = 0 }: { summariesThisMon
         return
       }
 
+      analytics.summaryGenerated(selectedStyle)
       window.location.reload()
     } catch {
       setError('Network error — please try again')
@@ -241,29 +252,44 @@ export default function PdfUpload({ summariesThisMonth = 0 }: { summariesThisMon
             /* ── Upgrade panel ── */
             <div onClick={(e) => e.stopPropagation()}>
               <div className="text-5xl mb-4">🔒</div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">Monthly limit reached</h2>
-              <p className="text-gray-500 mb-5">
-                You&apos;ve used all {FREE_LIMIT} free summaries this month.
+              <h2 className="text-xl font-semibold mb-2" style={{ color: 'var(--app-text)' }}>Monthly limit reached</h2>
+              <p className="mb-5" style={{ color: 'var(--app-muted)' }}>
+                You&apos;ve used all {monthlyLimit} summaries this month.
               </p>
               <div className="max-w-xs mx-auto rounded-2xl p-4 mb-5 text-left" style={{ background: 'var(--app-accent-dim)', border: '1px solid rgba(201,150,58,0.25)' }}>
-                <p className="text-sm font-semibold mb-2" style={{ color: 'var(--app-text)' }}>⚡ BookDigest Pro</p>
-                <ul className="space-y-1.5">
-                  {['Unlimited summaries', 'Priority processing', 'Advanced export options'].map(f => (
-                    <li key={f} className="text-sm flex items-center gap-1.5" style={{ color: '#8a6820' }}>
-                      <span className="font-bold" style={{ color: 'var(--app-accent)' }}>✓</span> {f}
-                    </li>
-                  ))}
-                </ul>
+                {upsellTier === 'pro' ? (
+                  <>
+                    <p className="text-sm font-semibold mb-2" style={{ color: 'var(--app-text)' }}>⚡ BookDigest Pro</p>
+                    <ul className="space-y-1.5">
+                      {['Unlimited summaries', 'Priority processing', 'Advanced export options'].map(f => (
+                        <li key={f} className="text-sm flex items-center gap-1.5" style={{ color: '#8a6820' }}>
+                          <span className="font-bold" style={{ color: 'var(--app-accent)' }}>✓</span> {f}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold mb-2" style={{ color: 'var(--app-text)' }}>📚 BookDigest Reader</p>
+                    <ul className="space-y-1.5">
+                      {['20 summaries per month', 'All summary styles', 'Priority support'].map(f => (
+                        <li key={f} className="text-sm flex items-center gap-1.5" style={{ color: '#8a6820' }}>
+                          <span className="font-bold" style={{ color: 'var(--app-accent)' }}>✓</span> {f}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
               </div>
               <button
-                onClick={upgradeToStripe}
+                onClick={() => handleUpgrade(upsellTier)}
                 disabled={upgrading}
                 className="px-6 py-3 font-semibold rounded-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed" style={{ background: 'var(--app-accent)', color: '#1a0f00' }}
               >
-                {upgrading ? 'Redirecting…' : 'Upgrade to Pro →'}
+                {upgrading ? 'Redirecting…' : upsellTier === 'pro' ? 'Upgrade to Pro →' : 'Upgrade to Reader →'}
               </button>
               <p className="text-xs text-gray-400 mt-3">
-                Free limit resets on {resetDateStr}
+                Limit resets on {resetDateStr}
               </p>
             </div>
           ) : (
@@ -348,46 +374,66 @@ export default function PdfUpload({ summariesThisMonth = 0 }: { summariesThisMon
 
           {/* Book / Research Paper toggle */}
           <div className="inline-flex rounded-xl p-1 mb-6" style={{ background: 'var(--app-border)' }}>
-            {(['book', 'paper'] as const).map((type) => (
-              <button
-                key={type}
-                onClick={() => {
-                  setDocType(type)
-                  setSelectedStyle(type === 'paper' ? 'research' : 'executive')
-                }}
-                className="px-4 py-1.5 rounded-lg text-sm font-medium transition-all"
-                style={docType === type
-                  ? { background: 'var(--app-surface)', color: 'var(--app-text)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }
-                  : { color: 'var(--app-muted)' }
-                }
-              >
-                {type === 'book' ? '📚 Book' : '🔬 Research Paper'}
-              </button>
-            ))}
+            {(['book', 'paper'] as const).map((type) => {
+              const isLocked = tier === 'free' && type === 'paper'
+              return (
+                <button
+                  key={type}
+                  onClick={() => {
+                    if (isLocked) return
+                    setDocType(type)
+                    setSelectedStyle(type === 'paper' ? 'research' : 'executive')
+                  }}
+                  disabled={isLocked}
+                  className="px-4 py-1.5 rounded-lg text-sm font-medium transition-all"
+                  style={isLocked
+                    ? { color: 'var(--app-muted)', opacity: 0.5, cursor: 'not-allowed' }
+                    : docType === type
+                    ? { background: 'var(--app-surface)', color: 'var(--app-text)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }
+                    : { color: 'var(--app-muted)' }
+                  }
+                >
+                  {type === 'book' ? '📚 Book' : '🔬 Research Paper'}{isLocked ? ' 🔒' : ''}
+                </button>
+              )
+            })}
           </div>
 
           {/* Book: 3 style cards */}
           {docType === 'book' && (
-            <div className="grid grid-cols-3 gap-3 max-w-lg mx-auto mb-6">
+            <div className="grid grid-cols-3 gap-3 max-w-lg mx-auto mb-3">
               {BOOK_STYLES.map((key) => {
                 const val = SUMMARY_STYLES[key]
+                const isLocked = tier === 'free' && !(FREE_STYLES as readonly string[]).includes(key)
                 return (
                   <button
                     key={key}
-                    onClick={() => setSelectedStyle(key)}
-                    className="p-4 rounded-xl border-2 transition-all text-left"
-                    style={selectedStyle === key
+                    onClick={() => !isLocked && setSelectedStyle(key)}
+                    disabled={isLocked}
+                    className="relative p-4 rounded-xl border-2 transition-all text-left"
+                    style={isLocked
+                      ? { borderColor: 'var(--app-border)', opacity: 0.55, cursor: 'not-allowed' }
+                      : selectedStyle === key
                       ? { borderColor: 'var(--app-accent)', background: 'var(--app-accent-dim)' }
                       : { borderColor: 'var(--app-border)' }
                     }
                   >
+                    {isLocked && <span className="absolute top-2 right-2 text-xs">🔒</span>}
                     <div className="text-2xl mb-1">{val.emoji}</div>
-                    <div className="font-medium text-gray-900 text-sm">{val.label}</div>
-                    <div className="text-xs text-gray-500">{val.description}</div>
+                    <div className="font-medium text-sm" style={{ color: 'var(--app-text)' }}>{val.label}</div>
+                    <div className="text-xs mt-0.5" style={{ color: 'var(--app-muted)' }}>{val.description}</div>
                   </button>
                 )
               })}
             </div>
+          )}
+
+          {/* Free tier note */}
+          {tier === 'free' && docType === 'book' && (
+            <p className="text-xs text-center mb-4" style={{ color: 'var(--app-muted)' }}>
+              🔒 Study & Action styles require{' '}
+              <button onClick={() => handleUpgrade('reader')} className="underline" style={{ color: 'var(--app-accent)' }}>Reader or Pro</button>
+            </p>
           )}
 
           {/* Paper: single research card */}
@@ -398,8 +444,8 @@ export default function PdfUpload({ summariesThisMonth = 0 }: { summariesThisMon
                 style={{ borderColor: 'var(--app-accent)', background: 'var(--app-accent-dim)' }}
               >
                 <div className="text-2xl mb-1">🔬</div>
-                <div className="font-medium text-gray-900 text-sm">Research Analysis</div>
-                <div className="text-xs text-gray-500 mt-1">Research question · Methodology · Key findings · Citations</div>
+                <div className="font-medium text-sm" style={{ color: 'var(--app-text)' }}>Research Analysis</div>
+                <div className="text-xs mt-1" style={{ color: 'var(--app-muted)' }}>Research question · Methodology · Key findings · Citations</div>
               </div>
             </div>
           )}

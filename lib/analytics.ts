@@ -24,7 +24,7 @@ export const analytics = {
   pdfUploaded: () =>
     track('PDF Uploaded'),
 
-  summaryGenerated: (style: 'executive' | 'study' | 'action') =>
+  summaryGenerated: (style: 'executive' | 'study' | 'action' | 'research') =>
     track('Summary Generated', { style }),
 
   summaryExported: (format: 'markdown' | 'print') =>

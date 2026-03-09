@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
 import { SUMMARY_STYLES, BOOK_STYLES, LANGUAGES, FIELD_LABELS, CHAT_SUGGESTIONS, detectLanguageFromContent, buildUserContext, type SummaryStyle } from '@/lib/prompts'
 import { FREE_MONTHLY_LIMIT, READER_MONTHLY_LIMIT, FREE_STYLES, type Tier } from '@/lib/config'
+import { analytics } from '@/lib/analytics'
 import { createClient } from '@/lib/supabase'
 
 const resetDateStr = new Date(
@@ -211,6 +212,7 @@ export default function BookCard({ book, summariesThisMonth = 0, tier = 'free' }
 
   async function upgradeToStripe(targetTier: 'reader' | 'pro') {
     setUpgrading(true)
+    analytics.upgrade(targetTier)
     try {
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
@@ -402,6 +404,7 @@ export default function BookCard({ book, summariesThisMonth = 0, tier = 'free' }
       const data = await res.json()
       if (res.ok) {
         setAiAudioUrl(data.url)
+        analytics.audioPlayed()
       } else if (res.status === 403) {
         setAiError('upgrade')
       } else {
@@ -532,6 +535,7 @@ export default function BookCard({ book, summariesThisMonth = 0, tier = 'free' }
   }
 
   function handleDownload(style: SummaryStyle) {
+    analytics.summaryExported('markdown')
     downloadMarkdown(summaries[style]!, title)
     setDownloaded(style)
     setTimeout(() => setDownloaded(null), 2000)
@@ -751,7 +755,7 @@ export default function BookCard({ book, summariesThisMonth = 0, tier = 'free' }
                     )}
                   </button>
                   <button
-                    onClick={() => printSummary(summaries[activeTab]!, title)}
+                    onClick={() => { analytics.summaryExported('print'); printSummary(summaries[activeTab]!, title) }}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 hover:text-gray-800 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors shrink-0"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
