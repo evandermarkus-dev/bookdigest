@@ -60,7 +60,7 @@ function base(content: string) {
         <!-- Header -->
         <tr>
           <td style="padding:28px 36px 24px;border-bottom:1px solid #f0ede6;">
-            <span style="font-size:20px;font-weight:700;letter-spacing:-0.02em;color:#111;">Book<span style="color:#4f46e5;">Digest</span></span>
+            <span style="font-size:20px;font-weight:700;letter-spacing:-0.02em;color:#111;">Book<span style="color:#c9963a;">Digest</span></span>
           </td>
         </tr>
         <!-- Body -->
@@ -82,7 +82,7 @@ function base(content: string) {
 }
 
 function btn(href: string, label: string) {
-  return `<a href="${href}" style="display:inline-block;background:#4f46e5;color:#fff;font-weight:700;padding:13px 28px;border-radius:10px;text-decoration:none;font-size:15px;font-family:system-ui,sans-serif;">${label}</a>`
+  return `<a href="${href}" style="display:inline-block;background:#c9963a;color:#1a0f00;font-weight:700;padding:13px 28px;border-radius:10px;text-decoration:none;font-size:15px;font-family:system-ui,sans-serif;">${label}</a>`
 }
 
 function welcomeHtml() {
@@ -98,7 +98,7 @@ function welcomeHtml() {
       ${['Upload a PDF book', 'Answer 3 quick questions about your goals', 'Get your summary in Executive, Study, or Action style'].map((s, i) => `
       <tr>
         <td style="padding:4px 12px 4px 0;vertical-align:top;">
-          <span style="display:inline-block;width:22px;height:22px;border-radius:50%;background:#eef2ff;color:#4f46e5;font-size:12px;font-weight:700;text-align:center;line-height:22px;font-family:system-ui,sans-serif;">${i + 1}</span>
+          <span style="display:inline-block;width:22px;height:22px;border-radius:50%;background:#fdf3e0;color:#c9963a;font-size:12px;font-weight:700;text-align:center;line-height:22px;font-family:system-ui,sans-serif;">${i + 1}</span>
         </td>
         <td style="padding:4px 0;font-size:15px;color:#555;font-family:system-ui,sans-serif;">${s}</td>
       </tr>`).join('')}
@@ -112,7 +112,7 @@ function welcomeHtml() {
 
 function summaryReadyHtml(bookTitle: string, styleLabel: string, summaryUrl: string) {
   return base(`
-    <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#4f46e5;letter-spacing:0.06em;text-transform:uppercase;font-family:system-ui,sans-serif;">
+    <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#c9963a;letter-spacing:0.06em;text-transform:uppercase;font-family:system-ui,sans-serif;">
       Your summary is ready
     </p>
     <h1 style="margin:0 0 16px;font-size:26px;font-weight:900;line-height:1.2;color:#111;">
