@@ -7,12 +7,8 @@ import { sendSummaryReadyEmail } from '@/lib/email'
 import { polyfillDOMMatrix } from '@/lib/dommatrix-polyfill'
 import { checkRateLimit } from '@/lib/ratelimit'
 
-if (!process.env.ANTHROPIC_API_KEY) {
-  throw new Error('ANTHROPIC_API_KEY is required')
-}
-
 const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+  apiKey: process.env.ANTHROPIC_API_KEY ?? '',
 })
 
 const MAX_CHARS = MAX_PDF_CHARS
