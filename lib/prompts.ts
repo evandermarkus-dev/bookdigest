@@ -1,4 +1,6 @@
 
+export const FREE_LIMIT = 3
+
 export const FIELD_LABELS: Record<string, string> = {
   // Book styles
   overview: 'Overview',
