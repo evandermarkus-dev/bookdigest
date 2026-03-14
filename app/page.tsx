@@ -470,48 +470,108 @@ export default function Home() {
 
         {/* ─── PRICING ─── */}
         <section id="pricing" style={{ padding: '2rem 1.5rem 6rem', backgroundColor: 'var(--c-surface)' }}>
-          <div style={{ maxWidth: 480, margin: '0 auto', textAlign: 'center' }}>
+          <div style={{ maxWidth: 960, margin: '0 auto', textAlign: 'center' }}>
             <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--c-accent)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '1rem' }}>
               Pricing
             </p>
-            <h2 style={{ fontFamily: 'var(--font-playfair), Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 700, letterSpacing: '-0.025em', color: 'var(--c-text)', marginBottom: '3rem' }}>
-              Start free.<br />No catches.
+            <h2 style={{ fontFamily: 'var(--font-playfair), Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 700, letterSpacing: '-0.025em', color: 'var(--c-text)', marginBottom: '0.75rem' }}>
+              Start free.<br />Scale when ready.
             </h2>
+            <p style={{ color: 'var(--c-muted)', fontSize: '1rem', marginBottom: '3rem' }}>
+              No credit card required to get started.
+            </p>
 
-            <div style={{
-              backgroundColor: 'var(--c-bg)', border: '1px solid var(--c-accent)',
-              borderRadius: '1.5rem', padding: '2.5rem', textAlign: 'left',
-              boxShadow: '0 0 80px rgba(201,150,58,0.07)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.625rem', marginBottom: '0.375rem' }}>
-                <span style={{ fontFamily: 'var(--font-playfair), Georgia, serif', fontSize: '3rem', fontWeight: 900, color: 'var(--c-text)', letterSpacing: '-0.03em' }}>
-                  Free
-                </span>
-                <span style={{ color: 'var(--c-muted)', fontSize: '1rem' }}>forever</span>
-              </div>
-              <p style={{ color: 'var(--c-muted)', marginBottom: '2rem', fontSize: '0.9375rem' }}>
-                Everything you need to start reading smarter
-              </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem', textAlign: 'left' }}>
+              {[
+                {
+                  name: 'Free',
+                  price: '0 kr',
+                  period: '',
+                  desc: 'Everything you need to start reading smarter.',
+                  features: ['3 AI summaries per month', '1 summary style', 'Personalization questionnaire', 'Markdown & PDF export', 'Delete books anytime'],
+                  cta: 'Get Started — Free',
+                  href: '/login',
+                  highlight: false,
+                },
+                {
+                  name: 'Reader',
+                  price: '79 kr',
+                  period: '/ month',
+                  desc: 'For regular readers who want more.',
+                  features: ['20 AI summaries per month', 'All 3 summary styles', 'Personalization questionnaire', 'Markdown & PDF export', 'Priority support'],
+                  cta: 'Start with Reader →',
+                  href: '/login',
+                  highlight: false,
+                },
+                {
+                  name: 'Pro',
+                  price: '149 kr',
+                  period: '/ month',
+                  desc: 'Unlimited for power readers.',
+                  features: ['Unlimited summaries', 'All 3 summary styles', 'Personalization questionnaire', 'Markdown & PDF export', 'Priority support'],
+                  cta: 'Start with Pro →',
+                  href: '/login',
+                  highlight: true,
+                },
+              ].map((plan) => (
+                <div
+                  key={plan.name}
+                  style={{
+                    backgroundColor: plan.highlight ? 'rgba(201,150,58,0.07)' : 'var(--c-bg)',
+                    border: plan.highlight ? '2px solid rgba(201,150,58,0.55)' : '1px solid var(--c-border)',
+                    borderRadius: '1.5rem',
+                    padding: '2rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    position: 'relative',
+                  }}
+                >
+                  {plan.highlight && (
+                    <div style={{
+                      position: 'absolute', top: '-13px', left: '50%', transform: 'translateX(-50%)',
+                      backgroundColor: 'var(--c-accent)', color: '#1a0f00',
+                      fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.05em',
+                      padding: '0.25rem 0.875rem', borderRadius: 100,
+                    }}>
+                      Most popular
+                    </div>
+                  )}
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem', marginBottom: '2rem' }}>
-                {[
-                  '3 AI summaries per month',
-                  'Executive summary style',
-                  'Personalization questionnaire',
-                  'Markdown & PDF export',
-                  'Delete books anytime',
-                  'Powered by Claude AI',
-                ].map((item, i) => (
-                  <div key={i} style={{ display: 'flex', gap: '0.75rem', fontSize: '0.9375rem', color: 'var(--c-text)', alignItems: 'flex-start' }}>
-                    <span className="c-check">✓</span>
-                    <span>{item}</span>
+                  <h3 style={{ fontFamily: 'var(--font-playfair), Georgia, serif', fontSize: '1.25rem', fontWeight: 700, color: 'var(--c-text)', marginBottom: '0.5rem' }}>
+                    {plan.name}
+                  </h3>
+
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.375rem', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--c-text)', letterSpacing: '-0.03em' }}>
+                      {plan.price}
+                    </span>
+                    {plan.period && (
+                      <span style={{ fontSize: '0.875rem', color: 'var(--c-muted)' }}>{plan.period}</span>
+                    )}
                   </div>
-                ))}
-              </div>
 
-              <a href="/login" className="c-btn-primary" style={{ display: 'block', textAlign: 'center', boxSizing: 'border-box', width: '100%', fontSize: '1.0625rem', padding: '1rem 2rem' }}>
-                Get Started — Free
-              </a>
+                  <p style={{ fontSize: '0.875rem', color: 'var(--c-muted)', marginBottom: '1.5rem', lineHeight: 1.55 }}>
+                    {plan.desc}
+                  </p>
+
+                  <ul style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '2rem', flex: 1 }}>
+                    {plan.features.map((f) => (
+                      <li key={f} style={{ display: 'flex', gap: '0.625rem', fontSize: '0.9rem', color: 'var(--c-text)', alignItems: 'flex-start' }}>
+                        <span className="c-check" style={{ marginTop: '0.05em' }}>✓</span>
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <a
+                    href={plan.href}
+                    className={plan.highlight ? 'c-btn-primary' : 'c-btn-ghost'}
+                    style={{ display: 'block', textAlign: 'center', boxSizing: 'border-box', width: '100%', padding: '0.875rem 1.5rem', fontSize: '0.9375rem' }}
+                  >
+                    {plan.cta}
+                  </a>
+                </div>
+              ))}
             </div>
           </div>
         </section>
