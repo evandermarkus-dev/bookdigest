@@ -6,6 +6,7 @@ import BookCard, { type Book } from '@/components/BookCard'
 import LibrarySearch from '@/components/LibrarySearch'
 import UsageStats from '@/components/UsageStats'
 import { type SummaryStyle } from '@/lib/prompts'
+import { type Tier } from '@/lib/config'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +24,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     .from('summaries')
     .select('*')
     .order('created_at', { ascending: false })
+    .limit(50)
 
   // Group summaries by file_path (one entry per uploaded book)
   const booksMap = (summaries ?? []).reduce<Record<string, Book>>((acc, summary) => {
@@ -41,12 +43,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
   const summariesThisMonth = allSummaries.filter(s => s.created_at >= startOfMonth).length
 
-  // User profile (streak + pro status)
+  // User profile (streak + tier)
   const { data: userProfile } = await supabase
     .from('user_profiles')
-    .select('streak_count, longest_streak, is_pro')
+    .select('streak_count, longest_streak, tier')
     .eq('user_id', user.id)
     .single()
+
+  const tier = ((userProfile?.tier as Tier) ?? 'free')
 
   return (
     <main className="min-h-screen" style={{ background: 'var(--app-bg)' }}>
@@ -58,6 +62,18 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </h1>
           <div className="flex items-center gap-3 min-w-0">
             <span className="text-sm truncate hidden sm:block" style={{ color: 'var(--app-muted)' }}>{user.email}</span>
+            {user.email === 'evandermarkus@gmail.com' && (
+              <Link
+                href="/admin"
+                className="p-1.5 rounded-lg transition-colors hover:bg-black/5"
+                style={{ color: 'var(--app-muted)' }}
+                title="Admin"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </Link>
+            )}
             <Link
               href="/settings"
               className="p-1.5 rounded-lg transition-colors hover:bg-black/5"
@@ -99,11 +115,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           summariesThisMonth={summariesThisMonth}
           streakCount={userProfile?.streak_count ?? 0}
           longestStreak={userProfile?.longest_streak ?? 0}
-          isPro={userProfile?.is_pro ?? false}
+          tier={tier}
         />
 
         {/* Upload Area */}
-        <PdfUpload summariesThisMonth={summariesThisMonth} />
+        <PdfUpload summariesThisMonth={summariesThisMonth} tier={tier} />
 
         {/* Books */}
         <div className="mt-10">
@@ -111,6 +127,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <LibrarySearch
             books={books}
             summariesThisMonth={summariesThisMonth}
+            tier={tier}
             emptyState={
               <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--app-surface)', border: '1px solid var(--app-border)' }}>
                 <div className="px-8 pt-10 pb-8 text-center">
