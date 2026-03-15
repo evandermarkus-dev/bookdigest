@@ -2,10 +2,12 @@
 
 import { useState, useMemo } from 'react'
 import BookCard, { type Book } from './BookCard'
+import { type Tier } from '@/lib/config'
 
 interface Props {
   books: Book[]
   summariesThisMonth: number
+  tier?: Tier
   emptyState: React.ReactNode
 }
 
@@ -34,7 +36,7 @@ function matchesQuery(book: Book, query: string): boolean {
   return book.file_name.toLowerCase().includes(query)
 }
 
-export default function LibrarySearch({ books, summariesThisMonth, emptyState }: Props) {
+export default function LibrarySearch({ books, summariesThisMonth, tier = 'free', emptyState }: Props) {
   const [query, setQuery] = useState('')
 
   const filtered = useMemo(() => {
@@ -101,7 +103,7 @@ export default function LibrarySearch({ books, summariesThisMonth, emptyState }:
             </p>
           )}
           {filtered.map(book => (
-            <BookCard key={book.file_path} book={book} summariesThisMonth={summariesThisMonth} />
+            <BookCard key={book.file_path} book={book} summariesThisMonth={summariesThisMonth} tier={tier} />
           ))}
         </div>
       )}

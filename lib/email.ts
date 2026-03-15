@@ -1,6 +1,6 @@
 import { Resend } from 'resend'
 
-const FROM = process.env.EMAIL_FROM ?? 'BookDigest <noreply@bookdigest.com>'
+const FROM = process.env.EMAIL_FROM ?? 'BookDigest <noreply@bookdigest.se>'
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3001'
 
 // Silently skip if no API key configured
@@ -15,8 +15,12 @@ export async function sendWelcomeEmail(to: string) {
     await resend.emails.send({
       from: FROM,
       to,
-      subject: 'Welcome to BookDigest 📚',
+      subject: 'Welcome to BookDigest',
       html: welcomeHtml(),
+      headers: {
+        'List-Unsubscribe': `<mailto:noreply@bookdigest.se?subject=unsubscribe>`,
+        'X-Entity-Ref-ID': `welcome-${Date.now()}`,
+      },
     })
   } catch (err) {
     console.error('[email] Welcome send failed:', err)
@@ -36,8 +40,12 @@ export async function sendSummaryReadyEmail(to: string, bookTitle: string, style
     await resend.emails.send({
       from: FROM,
       to,
-      subject: `Your "${bookTitle}" summary is ready 📚`,
+      subject: `Your "${bookTitle}" summary is ready`,
       html: summaryReadyHtml(bookTitle, styleLabel, summaryUrl),
+      headers: {
+        'List-Unsubscribe': `<mailto:noreply@bookdigest.se?subject=unsubscribe>`,
+        'X-Entity-Ref-ID': `summary-ready-${Date.now()}`,
+      },
     })
   } catch (err) {
     console.error('[email] Summary ready send failed:', err)

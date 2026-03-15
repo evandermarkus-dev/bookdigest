@@ -1,4 +1,4 @@
-import { FREE_LIMIT } from '@/lib/prompts'
+import { FREE_MONTHLY_LIMIT, READER_MONTHLY_LIMIT, type Tier } from '@/lib/config'
 
 interface UsageStatsProps {
   totalBooks: number
@@ -6,7 +6,7 @@ interface UsageStatsProps {
   summariesThisMonth: number
   streakCount?: number
   longestStreak?: number
-  isPro?: boolean
+  tier?: Tier
 }
 
 export default function UsageStats({
@@ -15,11 +15,12 @@ export default function UsageStats({
   summariesThisMonth,
   streakCount = 0,
   longestStreak = 0,
-  isPro = false,
+  tier = 'free',
 }: UsageStatsProps) {
-  const pct = Math.min((summariesThisMonth / FREE_LIMIT) * 100, 100)
-  const remaining = Math.max(FREE_LIMIT - summariesThisMonth, 0)
-  const atLimit = !isPro && summariesThisMonth >= FREE_LIMIT
+  const limit = tier === 'pro' ? null : tier === 'reader' ? READER_MONTHLY_LIMIT : FREE_MONTHLY_LIMIT
+  const pct = limit !== null ? Math.min((summariesThisMonth / limit) * 100, 100) : 0
+  const remaining = limit !== null ? Math.max(limit - summariesThisMonth, 0) : 0
+  const atLimit = limit !== null && summariesThisMonth >= limit
 
   return (
     <div
@@ -58,7 +59,18 @@ export default function UsageStats({
           </div>
         )}
 
-        {isPro && (
+        {tier === 'reader' && (
+          <div className="flex items-center">
+            <span
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full"
+              style={{ background: 'var(--app-accent-dim)', color: '#8a6820', border: '1px solid rgba(201,150,58,0.3)' }}
+            >
+              📚 Reader
+            </span>
+          </div>
+        )}
+
+        {tier === 'pro' && (
           <div className="flex items-center">
             <span
               className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full"
@@ -71,12 +83,17 @@ export default function UsageStats({
       </div>
 
       {/* Monthly usage bar */}
-      {!isPro ? (
+      {tier === 'pro' ? (
+        <div className="sm:w-56 shrink-0">
+          <p className="text-xs font-medium" style={{ color: 'var(--app-accent)' }}>Unlimited summaries</p>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--app-muted)' }}>BookDigest Pro active</p>
+        </div>
+      ) : (
         <div className="sm:w-56 shrink-0">
           <div className="flex justify-between text-xs mb-1.5" style={{ color: 'var(--app-muted)' }}>
             <span>Monthly usage</span>
             <span style={atLimit ? { color: '#b45309', fontWeight: 500 } : {}}>
-              {summariesThisMonth}/{FREE_LIMIT}
+              {summariesThisMonth}/{limit}
             </span>
           </div>
           <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--app-border)' }}>
@@ -91,11 +108,6 @@ export default function UsageStats({
           <p className="text-xs mt-1.5" style={{ color: atLimit ? '#b45309' : 'var(--app-muted)', fontWeight: atLimit ? 500 : undefined }}>
             {atLimit ? 'Monthly limit reached' : `${remaining} remaining this month`}
           </p>
-        </div>
-      ) : (
-        <div className="sm:w-56 shrink-0">
-          <p className="text-xs font-medium" style={{ color: 'var(--app-accent)' }}>Unlimited summaries</p>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--app-muted)' }}>BookDigest Pro active</p>
         </div>
       )}
     </div>

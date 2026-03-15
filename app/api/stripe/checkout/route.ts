@@ -2,13 +2,25 @@ import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createClient } from '@/lib/supabase-server'
 
-export async function POST() {
+export async function POST(request: Request) {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const body = await request.json().catch(() => ({}))
+  const tier: 'reader' | 'pro' = body.tier === 'reader' ? 'reader' : 'pro'
+
+  const priceId = tier === 'reader'
+    ? process.env.STRIPE_READER_PRICE_ID!
+    : process.env.STRIPE_PRO_PRICE_ID!
+
+  if (!priceId) {
+    console.error(`[stripe] Missing price ID for tier: ${tier}`)
+    return NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 })
   }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3001'
@@ -33,10 +45,10 @@ export async function POST() {
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
     mode: 'subscription',
-    line_items: [{ price: process.env.STRIPE_PRICE_ID!, quantity: 1 }],
+    line_items: [{ price: priceId, quantity: 1 }],
     success_url: `${siteUrl}/api/stripe/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${siteUrl}/dashboard`,
-    metadata: { supabase_user_id: user.id },
+    metadata: { supabase_user_id: user.id, tier },
   })
 
   return NextResponse.json({ url: session.url })
