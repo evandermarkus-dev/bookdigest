@@ -16,7 +16,7 @@ export const FREE_MONTHLY_LIMIT = 3
 export const READER_MONTHLY_LIMIT = 20
 
 /** Summary styles available on the Free tier. Reader and Pro get all styles. */
-export const FREE_STYLES = ['executive'] as const
+export const FREE_STYLES = ['executive', 'research'] as const
 export type FreeStyle = typeof FREE_STYLES[number]
 
 /** Returns the monthly summary limit for a tier, or null for unlimited (Pro). */

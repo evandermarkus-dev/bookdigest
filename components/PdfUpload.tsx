@@ -143,7 +143,7 @@ export default function PdfUpload({ summariesThisMonth = 0, tier = 'free' }: { s
 
     analytics.pdfUploaded()
     setFilePath(path)
-    setState('questionnaire')
+    setState(docType === 'paper' ? 'select_style' : 'questionnaire')
   }
 
   // Save profile to DB, then advance to style selection
@@ -165,8 +165,8 @@ export default function PdfUpload({ summariesThisMonth = 0, tier = 'free' }: { s
     setError(null)
 
     const profile: UserProfile = { goal: answers.goal, level: answers.level, focus: answers.focus }
-    const userContext = buildUserContext(profile)
-    localStorage.setItem('bookdigest_user_context', userContext)
+    const userContext = docType === 'paper' ? '' : buildUserContext(profile)
+    if (docType !== 'paper') localStorage.setItem('bookdigest_user_context', userContext)
 
     try {
       const res = await fetch('/api/summarize', {
@@ -294,9 +294,26 @@ export default function PdfUpload({ summariesThisMonth = 0, tier = 'free' }: { s
             </div>
           ) : (
             <>
-              <div className="text-5xl mb-4">{isDragging ? '📂' : '📄'}</div>
+              {!isDragging && (
+                <div className="inline-flex rounded-xl p-1 mb-5" style={{ background: 'var(--app-border)' }} onClick={e => e.stopPropagation()}>
+                  {(['book', 'paper'] as const).map((type) => (
+                    <button
+                      key={type}
+                      onClick={(e) => { e.stopPropagation(); setDocType(type); setSelectedStyle(type === 'paper' ? 'research' : 'executive') }}
+                      className="px-4 py-1.5 rounded-lg text-sm font-medium transition-all"
+                      style={docType === type
+                        ? { background: 'var(--app-surface)', color: 'var(--app-text)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }
+                        : { color: 'var(--app-muted)' }
+                      }
+                    >
+                      {type === 'book' ? '📚 Book' : '📄 Research Paper'}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="text-5xl mb-4">{isDragging ? '📂' : docType === 'paper' ? '🔬' : '📄'}</div>
               <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                {isDragging ? 'Drop it here!' : 'Upload a PDF book'}
+                {isDragging ? 'Drop it here!' : docType === 'paper' ? 'Upload a Research Paper' : 'Upload a PDF book'}
               </h2>
               {!isDragging && (
                 <>
@@ -372,33 +389,6 @@ export default function PdfUpload({ summariesThisMonth = 0, tier = 'free' }: { s
           <h2 className="text-xl font-semibold text-gray-900 mb-1">Choose summary style</h2>
           <p className="text-sm text-gray-500 mb-5 truncate max-w-xs mx-auto">{fileName}</p>
 
-          {/* Book / Research Paper toggle */}
-          <div className="inline-flex rounded-xl p-1 mb-6" style={{ background: 'var(--app-border)' }}>
-            {(['book', 'paper'] as const).map((type) => {
-              const isLocked = tier === 'free' && type === 'paper'
-              return (
-                <button
-                  key={type}
-                  onClick={() => {
-                    if (isLocked) return
-                    setDocType(type)
-                    setSelectedStyle(type === 'paper' ? 'research' : 'executive')
-                  }}
-                  disabled={isLocked}
-                  className="px-4 py-1.5 rounded-lg text-sm font-medium transition-all"
-                  style={isLocked
-                    ? { color: 'var(--app-muted)', opacity: 0.5, cursor: 'not-allowed' }
-                    : docType === type
-                    ? { background: 'var(--app-surface)', color: 'var(--app-text)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }
-                    : { color: 'var(--app-muted)' }
-                  }
-                >
-                  {type === 'book' ? '📚 Book' : '🔬 Research Paper'}{isLocked ? ' 🔒' : ''}
-                </button>
-              )
-            })}
-          </div>
-
           {/* Book: 3 style cards */}
           {docType === 'book' && (
             <div className="grid grid-cols-3 gap-3 max-w-lg mx-auto mb-3">
@@ -465,10 +455,10 @@ export default function PdfUpload({ summariesThisMonth = 0, tier = 'free' }: { s
 
           <div className="flex items-center justify-center gap-3">
             <button
-              onClick={() => setState('questionnaire')}
+              onClick={() => docType === 'paper' ? reset() : setState('questionnaire')}
               className="px-4 py-3 text-sm text-gray-500 hover:text-gray-700 transition-colors"
             >
-              ← Back
+              {docType === 'paper' ? '← Start over' : '← Back'}
             </button>
             <button
               onClick={handleGenerateSummary}
@@ -487,7 +477,7 @@ export default function PdfUpload({ summariesThisMonth = 0, tier = 'free' }: { s
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
           </svg>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Generating summary…</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">{docType === 'paper' ? 'Analyzing paper…' : 'Generating summary…'}</h2>
           <p className="text-sm text-gray-500">This takes about 30–60 seconds</p>
         </>
       )}

@@ -16,10 +16,14 @@ export const FIELD_LABELS: Record<string, string> = {
   tools_and_frameworks: 'Tools & Frameworks',
   '30_day_plan': '30-Day Plan',
   // Research / academic paper style
+  study_type: 'Study Type',
   research_question: 'Research Question',
+  sample: 'Sample',
   methodology: 'Methodology',
   key_findings: 'Key Findings',
+  novelty: 'Novelty & Contribution',
   limitations: 'Limitations',
+  practical_implications: 'Practical Implications',
   conclusion: 'Conclusion',
   key_citations: 'Key Citations',
 }
@@ -199,19 +203,22 @@ Focus entirely on practical, immediately applicable steps. You may use **bold** 
 Structure your response as valid JSON with this exact format:
 {
   "title": "Paper title",
+  "study_type": "Type of study — e.g. RCT, Meta-analysis, Cohort study, Survey, Qualitative, Case study, Literature review, Theoretical",
   "research_question": "The central research question or hypothesis being investigated",
-  "methodology": "Research methods used (e.g. RCT, meta-analysis, survey, qualitative study, literature review)",
+  "sample": "Sample description — e.g. 'N=1,204 adults with type 2 diabetes' or 'N/A — theoretical or literature review'",
+  "methodology": "How the study was conducted: design, data collection, and analysis approach",
   "key_findings": [
-    {"text": "finding 1", "page": 5},
+    {"text": "Finding with statistics where available (e.g. effect sizes, p-values, percentages)", "page": 5},
     {"text": "finding 2", "page": 8}
   ],
+  "novelty": "What this paper contributes that was not previously known or established — how does it differ from prior work?",
   "limitations": "Key limitations the authors acknowledge, or that you identify",
-  "conclusion": "Main conclusion and its broader implications",
-  "relevance": "Who should read this and why it matters",
-  "key_citations": ["Author (Year) — brief description of what was cited and why it matters"]
+  "practical_implications": "Concrete takeaways — what should practitioners or researchers do with these findings?",
+  "conclusion": "Main conclusion and its broader significance",
+  "key_citations": ["Author (Year) — what was cited and why it matters"]
 }
 
-Be precise and academic. Distinguish clearly between findings and interpretations. Do not add fields that are not in the schema above. ${PAGE_CITATION_INSTRUCTION} ${languageInstruction}`,
+Be precise and academic. Distinguish clearly between findings and interpretations. Include quantitative data (effect sizes, p-values, confidence intervals) in findings where present. Do not add fields that are not in the schema above. ${PAGE_CITATION_INSTRUCTION} ${languageInstruction}`,
   }
 
   // Sanitize userContext to prevent prompt injection: cap length and strip control characters
