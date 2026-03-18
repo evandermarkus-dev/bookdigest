@@ -203,6 +203,7 @@ export default function BookCard({ book, summariesThisMonth = 0, tier = 'free' }
   const [deleting, setDeleting] = useState(false)
 
   const existingCount = STYLES.filter(s => summaries[s]).length
+  const isPaper = !!summaries.research && !STYLES.some(s => summaries[s])
   const monthlyLimit = tier === 'pro' ? null : tier === 'reader' ? READER_MONTHLY_LIMIT : FREE_MONTHLY_LIMIT
   const atLimit = monthlyLimit !== null && summariesThisMonth >= monthlyLimit
   const upsellTier: 'reader' | 'pro' = tier === 'reader' ? 'pro' : 'reader'
@@ -567,21 +568,23 @@ export default function BookCard({ book, summariesThisMonth = 0, tier = 'free' }
     setGenerating(style)
     setError(null)
 
-    // Load user context from DB, fall back to localStorage
+    // Load user context from DB, fall back to localStorage (not applicable for research/paper)
     let userContext: string | undefined
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data: profile } = await supabase
-          .from('user_profiles')
-          .select('goal, level, focus')
-          .eq('user_id', user.id)
-          .single()
-        if (profile) userContext = buildUserContext(profile)
+    if (style !== 'research') {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: profile } = await supabase
+            .from('user_profiles')
+            .select('goal, level, focus')
+            .eq('user_id', user.id)
+            .single()
+          if (profile) userContext = buildUserContext(profile)
+        }
+      } catch {}
+      if (!userContext) {
+        userContext = localStorage.getItem('bookdigest_user_context') ?? undefined
       }
-    } catch {}
-    if (!userContext) {
-      userContext = localStorage.getItem('bookdigest_user_context') ?? undefined
     }
 
     try {
@@ -646,10 +649,20 @@ export default function BookCard({ book, summariesThisMonth = 0, tier = 'free' }
           onClick={() => setExpanded(!expanded)}
           className="flex-1 min-w-0 pr-4 text-left"
         >
-          <p className="font-semibold truncate" style={{ color: 'var(--app-text)' }}>{title}</p>
-          <p className="text-sm mt-0.5" style={{ color: 'var(--app-muted)' }}>
-            {[...STYLES.filter(s => summaries[s]).map(s => SUMMARY_STYLES[s].emoji), ...(summaries.research ? ['🔬'] : [])].join(' ')}
-            {' '}{existingCount}/{STYLES.length} styles{summaries.research ? ' · Research' : ''}
+          <div className="flex items-center gap-2 mb-0.5">
+            <p className="font-semibold truncate" style={{ color: 'var(--app-text)' }}>{title}</p>
+            {isPaper && (
+              <span className="shrink-0 text-xs font-medium px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(99,102,241,0.1)', color: '#6366f1' }}>
+                📄 Paper
+              </span>
+            )}
+          </div>
+          <p className="text-sm" style={{ color: 'var(--app-muted)' }}>
+            {isPaper
+              ? '🔬 Research analysis'
+              : <>{[...STYLES.filter(s => summaries[s]).map(s => SUMMARY_STYLES[s].emoji), ...(summaries.research ? ['🔬'] : [])].join(' ')}
+                {' '}{existingCount}/{STYLES.length} styles{summaries.research ? ' · Research' : ''}</>
+            }
           </p>
         </button>
         <div className="flex items-center gap-2 shrink-0">
