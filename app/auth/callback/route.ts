@@ -11,13 +11,14 @@ export async function GET(request: Request) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      // Send welcome email to new users (created within the last 60 seconds)
       const { data: { user } } = await supabase.auth.getUser()
       if (user?.email) {
         const createdAt = new Date(user.created_at).getTime()
         const isNewUser = Date.now() - createdAt < 60_000
         if (isNewUser) {
           sendWelcomeEmail(user.email) // fire-and-forget
+          // Redirect new users to Saga onboarding instead of dashboard
+          return NextResponse.redirect(`${origin}/onboarding`)
         }
       }
       return NextResponse.redirect(`${origin}${next}`)
