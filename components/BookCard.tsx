@@ -102,9 +102,78 @@ function summaryToSpeech(summary: Summary, title: string): string {
   return parts.join(' ')
 }
 
+function knowledgeToMarkdown(parsed: Record<string, unknown>, title: string): string {
+  const author = typeof parsed.author === 'string' ? parsed.author : ''
+  const tags = Array.isArray(parsed.tags) ? (parsed.tags as string[]) : []
+  const today = new Date().toISOString().slice(0, 10)
+
+  const lines: string[] = [
+    '---',
+    `title: "${title}"`,
+    ...(author ? [`author: "${author}"`] : []),
+    'tags:',
+    ...tags.map(t => `  - ${t}`),
+    `created: ${today}`,
+    'source: BookDigest',
+    '---',
+    '',
+    `# ${title}`,
+    '',
+    '*Knowledge Note — BookDigest*',
+    '',
+  ]
+
+  // Core Idea
+  if (parsed.core_idea) {
+    lines.push('## Core Idea', '', String(parsed.core_idea), '')
+  }
+
+  // Key Concepts
+  if (Array.isArray(parsed.key_concepts)) {
+    lines.push('## Key Concepts')
+    for (const item of parsed.key_concepts as Record<string, unknown>[]) {
+      const page = typeof item.page === 'number' ? ` *(p. ${item.page})*` : ''
+      lines.push(`- **${item.concept}** — ${item.definition}${page}`)
+    }
+    lines.push('')
+  }
+
+  // Key Insights
+  if (Array.isArray(parsed.key_insights)) {
+    lines.push('## Key Insights')
+    for (const item of parsed.key_insights as Record<string, unknown>[]) {
+      const page = typeof item.page === 'number' ? ` *(p. ${item.page})*` : ''
+      lines.push(`- ${item.text}${page}`)
+    }
+    lines.push('')
+  }
+
+  // Questions to Explore — Obsidian callout
+  if (Array.isArray(parsed.questions_to_explore)) {
+    lines.push('> [!question] Questions to Explore')
+    for (const q of parsed.questions_to_explore as string[]) {
+      lines.push(`> - ${q}`)
+    }
+    lines.push('')
+  }
+
+  // Related Topics — Obsidian callout
+  if (Array.isArray(parsed.related_topics)) {
+    lines.push('> [!tip] Related Topics & Books')
+    for (const item of parsed.related_topics as Record<string, unknown>[]) {
+      lines.push(`> - **${item.topic}** — ${item.reason}`)
+    }
+    lines.push('')
+  }
+
+  return lines.join('\n')
+}
+
 function summaryToMarkdown(summary: Summary, title: string): string {
   let parsed: Record<string, unknown>
   try { parsed = JSON.parse(summary.content) } catch { return summary.content }
+
+  if (summary.style === 'knowledge') return knowledgeToMarkdown(parsed, title)
 
   const styleInfo = SUMMARY_STYLES[summary.style]
   const lines: string[] = [

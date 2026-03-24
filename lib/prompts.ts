@@ -26,9 +26,14 @@ export const FIELD_LABELS: Record<string, string> = {
   practical_implications: 'Practical Implications',
   conclusion: 'Conclusion',
   key_citations: 'Key Citations',
+  // Knowledge / Obsidian style
+  core_idea: 'Core Idea',
+  key_concepts: 'Key Concepts',
+  questions_to_explore: 'Questions to Explore',
+  related_topics: 'Related Topics & Books',
 }
 
-export type SummaryStyle = 'executive' | 'study' | 'action' | 'research'
+export type SummaryStyle = 'executive' | 'study' | 'action' | 'research' | 'knowledge'
 
 export const SUMMARY_STYLES: Record<SummaryStyle, { label: string; description: string; emoji: string }> = {
   executive: {
@@ -51,10 +56,15 @@ export const SUMMARY_STYLES: Record<SummaryStyle, { label: string; description: 
     description: 'Academic analysis & key findings',
     emoji: '🔬',
   },
+  knowledge: {
+    label: 'Knowledge',
+    description: 'Structured literature note for your Obsidian vault',
+    emoji: '🧠',
+  },
 }
 
 /** The three styles shown for regular books (excludes 'research'). */
-export const BOOK_STYLES: SummaryStyle[] = ['executive', 'study', 'action']
+export const BOOK_STYLES: SummaryStyle[] = ['executive', 'study', 'action', 'knowledge']
 
 // Suggested chat questions — one set per supported language
 export const CHAT_SUGGESTIONS: Record<string, [string, string, string]> = {
@@ -219,6 +229,39 @@ Structure your response as valid JSON with this exact format:
 }
 
 Be precise and academic. Distinguish clearly between findings and interpretations. Include quantitative data (effect sizes, p-values, confidence intervals) in findings where present. Do not add fields that are not in the schema above. ${PAGE_CITATION_INSTRUCTION} ${languageInstruction}`,
+
+    knowledge: `You are a knowledge curator helping readers build their personal knowledge management system.
+Analyze this book and create a structured literature note optimized for Obsidian vaults.
+
+Structure your response as valid JSON with this exact format:
+{
+  "title": "Book title",
+  "author": "Author name — extract from the text if present, omit the field if not found",
+  "tags": ["tag1", "tag2", "tag3"],
+  "core_idea": "One paragraph synthesizing the book's central thesis and why it matters",
+  "key_concepts": [
+    {"concept": "ConceptName", "definition": "Clear one-sentence definition", "page": 42}
+  ],
+  "key_insights": [
+    {"text": "A key insight or idea from the book", "page": 89}
+  ],
+  "questions_to_explore": [
+    "An open question this book raises",
+    "A topic worth investigating further"
+  ],
+  "related_topics": [
+    {"topic": "Book or topic title", "reason": "Why it connects to this book"}
+  ]
+}
+
+Guidelines:
+- tags: 3-5 lowercase topic tags (e.g. ["python", "programming", "learning"])
+- key_concepts: 4-8 core concepts/terms the reader must understand
+- key_insights: 4-6 important ideas worth remembering
+- questions_to_explore: 3-5 thought-provoking questions for further inquiry
+- related_topics: 2-4 related books or topics the reader might explore next
+- You may use **bold** for key terms within text values.
+${PAGE_CITATION_INSTRUCTION} ${languageInstruction}`,
   }
 
   // Sanitize userContext to prevent prompt injection: cap length and strip control characters
