@@ -15,6 +15,13 @@ export const FIELD_LABELS: Record<string, string> = {
   weekly_habits: 'Weekly Habits',
   tools_and_frameworks: 'Tools & Frameworks',
   '30_day_plan': '30-Day Plan',
+  // Knowledge style
+  author: 'Author',
+  tags: 'Tags',
+  core_idea: 'Core Idea',
+  key_concepts: 'Key Concepts',
+  connections: 'Connections',
+  practical_application: 'Practical Application',
   // Research / academic paper style
   study_type: 'Study Type',
   research_question: 'Research Question',
@@ -28,7 +35,7 @@ export const FIELD_LABELS: Record<string, string> = {
   key_citations: 'Key Citations',
 }
 
-export type SummaryStyle = 'executive' | 'study' | 'action' | 'research'
+export type SummaryStyle = 'executive' | 'study' | 'action' | 'research' | 'knowledge'
 
 export const SUMMARY_STYLES: Record<SummaryStyle, { label: string; description: string; emoji: string }> = {
   executive: {
@@ -51,10 +58,15 @@ export const SUMMARY_STYLES: Record<SummaryStyle, { label: string; description: 
     description: 'Academic analysis & key findings',
     emoji: '🔬',
   },
+  knowledge: {
+    label: 'Knowledge',
+    description: 'Structured knowledge base entry for Obsidian',
+    emoji: '🧠',
+  },
 }
 
-/** The three styles shown for regular books (excludes 'research'). */
-export const BOOK_STYLES: SummaryStyle[] = ['executive', 'study', 'action']
+/** The four styles shown for regular books (excludes 'research'). */
+export const BOOK_STYLES: SummaryStyle[] = ['executive', 'study', 'action', 'knowledge']
 
 // Suggested chat questions — one set per supported language
 export const CHAT_SUGGESTIONS: Record<string, [string, string, string]> = {
@@ -219,6 +231,26 @@ Structure your response as valid JSON with this exact format:
 }
 
 Be precise and academic. Distinguish clearly between findings and interpretations. Include quantitative data (effect sizes, p-values, confidence intervals) in findings where present. Do not add fields that are not in the schema above. ${PAGE_CITATION_INSTRUCTION} ${languageInstruction}`,
+
+    knowledge: `You are a knowledge curator. Create a structured knowledge base entry for this book, optimized for import into Obsidian or any PKM (Personal Knowledge Management) tool.
+
+Structure your response as valid JSON with this exact format:
+{
+  "title": "Book title",
+  "author": "Author name",
+  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
+  "core_idea": "The single most important idea from this book in 2-3 sentences",
+  "key_concepts": [
+    {"concept": "Concept name", "explanation": "Brief explanation of this concept and why it matters", "page": 0}
+  ],
+  "connections": ["→ Related book or idea — why it connects"],
+  "practical_application": "How to apply the core ideas from this book in practice"
+}
+
+Tags: 5-8 lowercase tags relevant to the book's themes, topics, and domain. Single words or short hyphenated phrases.
+Key concepts: Extract 5-8 of the most important, linkable concepts — the kind you would create [[wiki-links]] for in Obsidian.
+Connections: 3-5 links to related books, frameworks, or broader intellectual traditions.
+You may use **bold** for key terms within text values. ${PAGE_CITATION_INSTRUCTION} ${languageInstruction}`,
   }
 
   // Sanitize userContext to prevent prompt injection: cap length and strip control characters
