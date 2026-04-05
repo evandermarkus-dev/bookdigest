@@ -15,6 +15,13 @@ export const FIELD_LABELS: Record<string, string> = {
   weekly_habits: 'Weekly Habits',
   tools_and_frameworks: 'Tools & Frameworks',
   '30_day_plan': '30-Day Plan',
+  // Knowledge style
+  author: 'Author',
+  tags: 'Tags',
+  core_idea: 'Core Idea',
+  key_concepts: 'Key Concepts',
+  connections: 'Connections',
+  practical_application: 'Practical Application',
   // Research / academic paper style
   study_type: 'Study Type',
   research_question: 'Research Question',
@@ -26,11 +33,6 @@ export const FIELD_LABELS: Record<string, string> = {
   practical_implications: 'Practical Implications',
   conclusion: 'Conclusion',
   key_citations: 'Key Citations',
-  // Knowledge / Obsidian style
-  core_idea: 'Core Idea',
-  key_concepts: 'Key Concepts',
-  questions_to_explore: 'Questions to Explore',
-  related_topics: 'Related Topics & Books',
 }
 
 export type SummaryStyle = 'executive' | 'study' | 'action' | 'research' | 'knowledge'
@@ -58,12 +60,12 @@ export const SUMMARY_STYLES: Record<SummaryStyle, { label: string; description: 
   },
   knowledge: {
     label: 'Knowledge',
-    description: 'Structured literature note for your Obsidian vault',
+    description: 'Structured knowledge base entry for Obsidian',
     emoji: '🧠',
   },
 }
 
-/** The three styles shown for regular books (excludes 'research'). */
+/** The four styles shown for regular books (excludes 'research'). */
 export const BOOK_STYLES: SummaryStyle[] = ['executive', 'study', 'action', 'knowledge']
 
 // Suggested chat questions — one set per supported language
@@ -230,38 +232,25 @@ Structure your response as valid JSON with this exact format:
 
 Be precise and academic. Distinguish clearly between findings and interpretations. Include quantitative data (effect sizes, p-values, confidence intervals) in findings where present. Do not add fields that are not in the schema above. ${PAGE_CITATION_INSTRUCTION} ${languageInstruction}`,
 
-    knowledge: `You are a knowledge curator helping readers build their personal knowledge management system.
-Analyze this book and create a structured literature note optimized for Obsidian vaults.
+    knowledge: `You are a knowledge curator. Create a structured knowledge base entry for this book, optimized for import into Obsidian or any PKM (Personal Knowledge Management) tool.
 
 Structure your response as valid JSON with this exact format:
 {
   "title": "Book title",
-  "author": "Author name — extract from the text if present, omit the field if not found",
-  "tags": ["tag1", "tag2", "tag3"],
-  "core_idea": "One paragraph synthesizing the book's central thesis and why it matters",
+  "author": "Author name",
+  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
+  "core_idea": "The single most important idea from this book in 2-3 sentences",
   "key_concepts": [
-    {"concept": "ConceptName", "definition": "Clear one-sentence definition", "page": 42}
+    {"concept": "Concept name", "explanation": "Brief explanation of this concept and why it matters", "page": 0}
   ],
-  "key_insights": [
-    {"text": "A key insight or idea from the book", "page": 89}
-  ],
-  "questions_to_explore": [
-    "An open question this book raises",
-    "A topic worth investigating further"
-  ],
-  "related_topics": [
-    {"topic": "Book or topic title", "reason": "Why it connects to this book"}
-  ]
+  "connections": ["→ Related book or idea — why it connects"],
+  "practical_application": "How to apply the core ideas from this book in practice"
 }
 
-Guidelines:
-- tags: 3-5 lowercase topic tags (e.g. ["python", "programming", "learning"])
-- key_concepts: 4-8 core concepts/terms the reader must understand
-- key_insights: 4-6 important ideas worth remembering
-- questions_to_explore: 3-5 thought-provoking questions for further inquiry
-- related_topics: 2-4 related books or topics the reader might explore next
-- You may use **bold** for key terms within text values.
-${PAGE_CITATION_INSTRUCTION} ${languageInstruction}`,
+Tags: 5-8 lowercase tags relevant to the book's themes, topics, and domain. Single words or short hyphenated phrases.
+Key concepts: Extract 5-8 of the most important, linkable concepts — the kind you would create [[wiki-links]] for in Obsidian.
+Connections: 3-5 links to related books, frameworks, or broader intellectual traditions.
+You may use **bold** for key terms within text values. ${PAGE_CITATION_INSTRUCTION} ${languageInstruction}`,
   }
 
   // Sanitize userContext to prevent prompt injection: cap length and strip control characters

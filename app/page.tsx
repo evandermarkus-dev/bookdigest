@@ -11,9 +11,19 @@ const playfair = Playfair_Display({
   variable: '--font-playfair',
 })
 
-type StyleTab = 'Executive' | 'Study' | 'Action'
+type StyleTab = 'Executive' | 'Study' | 'Action' | 'Knowledge'
 
 const SHOWCASE: Record<StyleTab, { label: string; icon: string; desc: string; content: { h: string; p: string }[] }> = {
+  Knowledge: {
+    label: 'Knowledge Base',
+    icon: '🧠',
+    desc: 'Structured for Obsidian & PKM tools.',
+    content: [
+      { h: 'Core Idea', p: 'Tiny habits are not about willpower — they are about systems. By optimizing environment cues, reducing friction, and stacking habits, behavior change becomes automatic rather than effortful.' },
+      { h: 'Key Concepts', p: '• Habit loop (cue → routine → reward)\n• Implementation intentions\n• Habit stacking — linking new habits to existing ones\n• 2-minute rule: start with a tiny version of any habit' },
+      { h: 'Connections', p: '→ Willpower by Roy Baumeister · Peak by Anders Ericsson\n→ Cognitive load theory, operant conditioning\n→ BJ Fogg\'s Tiny Habits framework' },
+    ],
+  },
   Executive: {
     label: 'Executive Summary',
     icon: '⚡',
@@ -238,7 +248,7 @@ export default function Home() {
               color: 'var(--c-accent)', fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase',
             }}>
               <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: 'var(--c-accent)', display: 'inline-block', flexShrink: 0 }} />
-              AI-Powered Book Intelligence
+              AI-Powered Reading Intelligence
             </div>
 
             {/* Headline */}
@@ -258,7 +268,7 @@ export default function Home() {
               color: 'var(--c-muted)', maxWidth: 520, margin: '0 auto 2.25rem',
               lineHeight: 1.75,
             }}>
-              Upload any PDF book and get a personalized AI summary in minutes — tailored to your goals, experience, and the way you learn.
+              Upload any PDF book or research paper and get a personalized AI summary in minutes — tailored to your goals, experience, and the way you learn.
             </p>
 
             {/* CTAs */}
@@ -326,7 +336,7 @@ export default function Home() {
           }}>
             {[
               { num: '2–3 min', sub: 'per summary' },
-              { num: '3', sub: 'summary styles' },
+              { num: '5', sub: 'summary styles' },
               { num: '100%', sub: 'free to start' },
               { num: 'Claude AI', sub: 'powered by' },
             ].map((s, i) => (
@@ -358,7 +368,7 @@ export default function Home() {
               {[
                 { n: '01', icon: '↑', title: 'Upload your PDF', desc: 'Drag and drop any book, paper, or document. We extract the text and get to work.' },
                 { n: '02', icon: '◎', title: 'Tell us about you', desc: 'Answer 3 quick questions about your goals, experience, and focus. This shapes every summary.' },
-                { n: '03', icon: '✓', title: 'Choose your style', desc: 'Get your personalized summary in executive, deep study, or action-plan format — or all three.' },
+                { n: '03', icon: '✓', title: 'Choose your style', desc: 'Get your personalized summary in Executive, Study, Action, or Knowledge format. Research Analysis for academic papers.' },
               ].map((step, i) => (
                 <div key={i} className="c-card" style={{ padding: '2rem' }}>
                   <div style={{ fontFamily: 'var(--font-geist-mono, monospace)', fontSize: '0.75rem', fontWeight: 700, color: 'var(--c-accent)', letterSpacing: '0.1em', marginBottom: '1.25rem' }}>
@@ -384,10 +394,10 @@ export default function Home() {
           <div style={{ maxWidth: 820, margin: '0 auto' }}>
             <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
               <p style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--c-accent)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '1rem' }}>
-                Three modes
+                Four modes
               </p>
               <h2 style={{ fontFamily: 'var(--font-playfair), Georgia, serif', fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 700, letterSpacing: '-0.025em', lineHeight: 1.15, color: 'var(--c-text)', marginBottom: '1rem' }}>
-                One book, three perspectives
+                One book, four perspectives
               </h2>
               <p style={{ color: 'var(--c-muted)', fontSize: '1rem', maxWidth: 440, margin: '0 auto' }}>
                 Different goals need different summaries. Switch between styles anytime.
@@ -396,7 +406,7 @@ export default function Home() {
 
             {/* Tab buttons */}
             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginBottom: '1.75rem', flexWrap: 'wrap' }}>
-              {(['Executive', 'Study', 'Action'] as StyleTab[]).map(t => (
+              {(['Executive', 'Study', 'Action', 'Knowledge'] as StyleTab[]).map(t => (
                 <button
                   key={t}
                   onClick={() => setTab(t)}
@@ -452,11 +462,11 @@ export default function Home() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem' }}>
               {[
                 { icon: '🎯', title: 'Truly personalized', desc: 'Your goals, experience, and focus area shape every summary. No two users get the same output.' },
-                { icon: '⚡', title: 'Fast. Really fast.', desc: 'Most summaries complete in under 3 minutes. Not the 10 hours the book would have taken.' },
+                { icon: '🔬', title: 'Academic paper analysis', desc: 'Upload a research paper and get study type, methodology, key findings, limitations, and practical implications — structured for researchers.' },
                 { icon: '📤', title: 'Export anywhere', desc: 'Download as Markdown or print to PDF with one click. Your summaries, your format.' },
                 { icon: '🤖', title: 'Powered by Claude AI', desc: "Anthropic's most capable model for nuanced, accurate, genuinely useful summaries." },
-                { icon: '🔄', title: 'All styles, one upload', desc: 'Upload once, generate Executive, Study, and Action summaries anytime — independently.' },
-                { icon: '🔒', title: 'Private by design', desc: "Your books are yours. We don't train on your data, and you can delete everything." },
+                { icon: '🔄', title: 'All styles, one upload', desc: 'Upload once, generate all summary styles — Executive, Study, Action, Knowledge, or Research — anytime, independently.' },
+                { icon: '💬', title: 'Ask your summary', desc: 'Chat with your book. Ask follow-up questions, dig deeper into concepts, or test your understanding — powered by Claude.' },
               ].map((feat, i) => (
                 <div key={i} className="c-card" style={{ padding: '1.75rem' }}>
                   <div style={{ fontSize: '1.5rem', marginBottom: '0.875rem' }}>{feat.icon}</div>
@@ -487,8 +497,8 @@ export default function Home() {
                   name: 'Free',
                   price: '0 kr',
                   period: '',
-                  desc: 'Everything you need to start reading smarter.',
-                  features: ['3 AI summaries per month', '1 summary style', 'Personalization questionnaire', 'Markdown & PDF export', 'Delete books anytime'],
+                  desc: 'Read books and research papers. No credit card needed.',
+                  features: ['3 AI summaries per month', 'Executive & Research styles', 'Personalization questionnaire', 'Markdown & PDF export', 'Delete books anytime'],
                   cta: 'Get Started — Free',
                   href: '/login',
                   highlight: false,
@@ -498,7 +508,7 @@ export default function Home() {
                   price: '79 kr',
                   period: '/ month',
                   desc: 'For regular readers who want more.',
-                  features: ['20 AI summaries per month', 'All 3 summary styles', 'Personalization questionnaire', 'Markdown & PDF export', 'Priority support'],
+                  features: ['20 AI summaries per month', 'All 5 summary styles', 'Books and research papers', 'Personalization questionnaire', 'Markdown & PDF export', 'Priority support'],
                   cta: 'Start with Reader →',
                   href: '/login',
                   highlight: false,
@@ -508,7 +518,7 @@ export default function Home() {
                   price: '149 kr',
                   period: '/ month',
                   desc: 'Unlimited for power readers.',
-                  features: ['Unlimited summaries', 'All 3 summary styles', 'Personalization questionnaire', 'Markdown & PDF export', 'Priority support'],
+                  features: ['Unlimited summaries', 'All 5 summary styles', 'Books and research papers', 'Personalization questionnaire', 'Markdown & PDF export', 'Priority support'],
                   cta: 'Start with Pro →',
                   href: '/login',
                   highlight: true,
@@ -593,7 +603,7 @@ export default function Home() {
               <span className="c-shimmer-text">already digested.</span>
             </h2>
             <p style={{ color: 'var(--c-muted)', fontSize: '1.125rem', lineHeight: 1.7, maxWidth: 480, margin: '0 auto 2.5rem' }}>
-              Stop spending 10 hours on books you'll forget. Get the key insights in minutes, in the format that works for you.
+              Stop spending hours on books and papers you'll forget. Get the key insights in minutes, in the format that works for you.
             </p>
             <a href="/login" className="c-btn-primary" style={{ fontSize: '1.125rem', padding: '1.0625rem 2.5rem' }}>
               Start Reading Smarter →
