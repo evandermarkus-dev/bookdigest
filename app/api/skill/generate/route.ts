@@ -90,12 +90,11 @@ export async function POST(request: Request) {
     if (rlResponse) return rlResponse
   }
 
-  const body = await request.json() as {
-    summaryId: string
-    focusArea:  SkillFocusArea
-    tools:      string[]
-    persona:    SkillPersona
-    freetext?:  string
+  let body: { summaryId: string; focusArea: SkillFocusArea; tools: string[]; persona: SkillPersona; freetext?: string }
+  try {
+    body = await request.json() as typeof body
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
   const { summaryId, focusArea, tools, persona, freetext } = body
@@ -126,14 +125,24 @@ export async function POST(request: Request) {
   const summaryText = summaryToText(summary.content, summary.style, title)
   const prompt = getSkillPrompt({ summaryText, focusArea, tools, persona, freetext })
 
-  const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 2000,
-    messages: [{ role: 'user', content: prompt }],
-  })
+  let response
+  try {
+    response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 2000,
+      messages: [{ role: 'user', content: prompt }],
+    })
+  } catch (err) {
+    console.error('[skill/generate] Anthropic error:', err)
+    return NextResponse.json({ error: 'Skill generation failed. Please try again.' }, { status: 500 })
+  }
 
   const skillContent =
     response.content[0].type === 'text' ? response.content[0].text.trim() : ''
+
+  if (!skillContent) {
+    return NextResponse.json({ error: 'Skill generation produced no content. Please try again.' }, { status: 500 })
+  }
 
   const fallback = `${title}-${focusArea}`
   const skillName = extractSkillName(skillContent, fallback)
