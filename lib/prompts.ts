@@ -284,3 +284,67 @@ export function buildUserContext(profile: UserProfile): string {
   }
   return `Reader context: Goal is to ${goalMap[profile.goal] ?? profile.goal}. Experience level: ${levelMap[profile.level] ?? profile.level}. Focus preference: ${focusMap[profile.focus] ?? profile.focus}.`
 }
+
+// ── Claude Skill Builder ──────────────────────────────────────────────────────
+
+export type SkillFocusArea = 'teaching' | 'practical' | 'decisions' | 'reference'
+export type SkillPersona   = 'expert'   | 'mentor'    | 'concise'   | 'socratic'
+
+const SKILL_FOCUS_LABELS: Record<SkillFocusArea, string> = {
+  teaching:  'Teaching & explaining concepts',
+  practical: 'Practical application & workflows',
+  decisions: 'Decision-making & frameworks',
+  reference: 'Reference & quick lookup',
+}
+
+const SKILL_PERSONA_LABELS: Record<SkillPersona, string> = {
+  expert:   'Strict expert — direct, precise, no fluff',
+  mentor:   'Friendly mentor — encouraging, explains reasoning',
+  concise:  'Concise assistant — bullet points, short answers',
+  socratic: 'Socratic teacher — asks questions, guides discovery',
+}
+
+export function getSkillPrompt(params: {
+  summaryText:  string
+  focusArea:    SkillFocusArea
+  tools:        string[]
+  persona:      SkillPersona
+  freetext?:    string
+}): string {
+  const { summaryText, focusArea, tools, persona, freetext } = params
+  const sanitizedFreetext = freetext
+    ? freetext.slice(0, 500).replace(/[<>{}\[\]\\]/g, '').trim()
+    : ''
+
+  return `You are a Claude Code skill architect. Create a complete, installable Claude Code skill (.md format) based on this book summary.
+
+BOOK SUMMARY:
+${summaryText}
+
+CONFIGURATION:
+- Focus: ${SKILL_FOCUS_LABELS[focusArea]}
+- Available tools: ${tools.join(', ')}
+- Persona: ${SKILL_PERSONA_LABELS[persona]}${sanitizedFreetext ? `\n- Extra instructions: ${sanitizedFreetext}` : ''}
+
+OUTPUT FORMAT — return ONLY valid markdown with this exact structure (including the --- delimiters):
+
+---
+name: kebab-case-skill-name
+description: One clear sentence describing what this skill does (max 100 chars)
+tools: ${tools.join(', ')}
+---
+
+# Skill Title
+
+Write 3–5 paragraphs of detailed instructions for Claude, in second person ("You are...", "When the user..."). Draw directly from the book's frameworks, concepts, and methodology. Reference the book's actual models and terminology. Be specific and actionable.
+
+## Core Principles
+
+- 3–5 bullet points from the book's central ideas, using the book's own language
+
+## How to Use This Skill
+
+- Example 1: a concrete prompt or scenario that activates this skill
+- Example 2: another scenario
+- Example 3: another scenario`
+}
