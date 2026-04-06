@@ -28,9 +28,10 @@ const redis = makeRedis()
 
 // Per-route limiters (keyed by user ID)
 export const limiters = redis ? {
-  summarize: makeLimiter(redis, 10, '1 h', 'summarize'), // Claude + PDF — most expensive
-  chat:      makeLimiter(redis, 30, '1 h', 'chat'),      // Claude Haiku chat messages
-  audio:     makeLimiter(redis, 5,  '1 h', 'audio'),     // Claude script + OpenAI TTS
+  summarize: makeLimiter(redis, 10, '1 h',  'summarize'), // Claude + PDF — most expensive
+  chat:      makeLimiter(redis, 30, '1 h',  'chat'),      // Claude Haiku chat messages
+  audio:     makeLimiter(redis, 5,  '1 h',  'audio'),     // Claude script + OpenAI TTS
+  skill:     makeLimiter(redis, 3,  '30 d', 'skill'),     // Claude Code skill generation
 } : null
 
 // ---------------------------------------------------------------------------

@@ -15,6 +15,9 @@ export const FREE_MONTHLY_LIMIT = 3
 /** Max summaries a Reader user can generate per calendar month. */
 export const READER_MONTHLY_LIMIT = 20
 
+/** Max Claude Code skills a Reader user can generate per rolling 30-day period. */
+export const READER_SKILL_LIMIT = 3
+
 /** Summary styles available on the Free tier. Reader and Pro get all styles. */
 export const FREE_STYLES = ['executive', 'research'] as const
 export type FreeStyle = typeof FREE_STYLES[number]
