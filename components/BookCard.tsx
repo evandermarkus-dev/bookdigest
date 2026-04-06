@@ -7,6 +7,7 @@ import { SUMMARY_STYLES, BOOK_STYLES, LANGUAGES, FIELD_LABELS, CHAT_SUGGESTIONS,
 import { FREE_MONTHLY_LIMIT, READER_MONTHLY_LIMIT, FREE_STYLES, type Tier } from '@/lib/config'
 import { analytics } from '@/lib/analytics'
 import { createClient } from '@/lib/supabase'
+import SkillBuilderModal from '@/components/SkillBuilderModal'
 
 const resetDateStr = new Date(
   new Date().getFullYear(), new Date().getMonth() + 1, 1
@@ -276,6 +277,13 @@ export default function BookCard({ book, summariesThisMonth = 0, tier = 'free' }
   const monthlyLimit = tier === 'pro' ? null : tier === 'reader' ? READER_MONTHLY_LIMIT : FREE_MONTHLY_LIMIT
   const atLimit = monthlyLimit !== null && summariesThisMonth >= monthlyLimit
   const upsellTier: 'reader' | 'pro' = tier === 'reader' ? 'pro' : 'reader'
+  const bestSummaryId =
+    summaries.knowledge?.id ??
+    summaries.executive?.id ??
+    summaries.study?.id ??
+    summaries.action?.id ??
+    summaries.research?.id ??
+    null
   const title = getTitle(summaries, book.file_name)
   const [downloaded, setDownloaded] = useState<SummaryStyle | null>(null)
   const [upgrading, setUpgrading] = useState(false)
@@ -324,6 +332,7 @@ export default function BookCard({ book, summariesThisMonth = 0, tier = 'free' }
     typeof window !== 'undefined' && !!localStorage.getItem('bookdigest_notion_setup')
   )
   const [chatOpen, setChatOpen] = useState(false)
+  const [skillOpen, setSkillOpen] = useState(false)
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
   const [chatInput, setChatInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
@@ -1030,6 +1039,30 @@ export default function BookCard({ book, summariesThisMonth = 0, tier = 'free' }
                     </svg>
                     Ask
                   </button>
+                  {/* Skill builder */}
+                  <button
+                    onClick={() => { if (tier !== 'free' && bestSummaryId) setSkillOpen(true) }}
+                    disabled={tier === 'free' || !bestSummaryId}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs border rounded-lg transition-colors shrink-0"
+                    style={
+                      tier === 'free'
+                        ? { color: 'var(--app-muted)', borderColor: 'var(--app-border)', opacity: 0.5, cursor: 'not-allowed' }
+                        : { color: 'var(--app-muted)', borderColor: 'var(--app-border)' }
+                    }
+                    title={
+                      tier === 'free'
+                        ? 'Upgrade to Reader to build Claude Skills'
+                        : !bestSummaryId
+                          ? 'Generate a summary first'
+                          : 'Build a Claude Code skill from this book'
+                    }
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l5.653-4.655m1.732-4.733a5.56 5.56 0 011.732 1.732" />
+                    </svg>
+                    🛠 Skill
+                    {tier === 'free' && <span className="text-xs opacity-40">🔒</span>}
+                  </button>
                 </div>
 
                 {/* Readwise token input (shown on first use) */}
@@ -1309,6 +1342,15 @@ export default function BookCard({ book, summariesThisMonth = 0, tier = 'free' }
             )}
           </div>
         </div>
+      )}
+      {bestSummaryId && (
+        <SkillBuilderModal
+          open={skillOpen}
+          onClose={() => setSkillOpen(false)}
+          bookTitle={title}
+          summaryId={bestSummaryId}
+          tier={tier}
+        />
       )}
     </div>
   )
