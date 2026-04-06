@@ -1,6 +1,7 @@
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 import { NextResponse } from 'next/server'
+import { READER_SKILL_LIMIT } from '@/lib/config'
 
 // ---------------------------------------------------------------------------
 // Rate limiting via Upstash Redis.
@@ -31,7 +32,7 @@ export const limiters = redis ? {
   summarize: makeLimiter(redis, 10, '1 h',  'summarize'), // Claude + PDF — most expensive
   chat:      makeLimiter(redis, 30, '1 h',  'chat'),      // Claude Haiku chat messages
   audio:     makeLimiter(redis, 5,  '1 h',  'audio'),     // Claude script + OpenAI TTS
-  skill:     makeLimiter(redis, 3,  '30 d', 'skill'),     // Claude Code skill generation
+  skill:     makeLimiter(redis, READER_SKILL_LIMIT, '30 d', 'skill'), // Claude Code skill generation
 } : null
 
 // ---------------------------------------------------------------------------
