@@ -1,11 +1,8 @@
 # outreach/tests/test_outreach.py
 
 import json
-import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from outreach import add_to_contacted, run_interactive_review, save_to_queue
 

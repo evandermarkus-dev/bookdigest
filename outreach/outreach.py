@@ -84,6 +84,8 @@ def run_interactive_review(
             add_to_contacted(lead["author"], contacted_path)
             console.print("[green]✓ Sparat.[/green]")
 
+    console.print(f"\n[bold green]Klar! Godkända leads sparade i {queue_path}[/bold green]")
+
 
 def main() -> None:
     reddit = praw.Reddit(
