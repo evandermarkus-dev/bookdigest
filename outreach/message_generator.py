@@ -26,10 +26,13 @@ def generate_message(lead: dict, client: anthropic.Anthropic) -> str:
         f"Post URL: {lead['url']}"
     )
 
-    response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=300,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user_prompt}],
-    )
-    return response.content[0].text.strip()
+    try:
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=300,
+            system=SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_prompt}],
+        )
+        return response.content[0].text.strip()
+    except Exception as e:
+        raise RuntimeError(f"Claude API call failed: {e}") from e

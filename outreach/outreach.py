@@ -60,13 +60,9 @@ def run_interactive_review(
         console.print(f"[dim]{lead['url']}[/dim]")
         console.print(Panel(lead["text"][:400], title="Deras inlägg", border_style="dim"))
 
-        console.print("[cyan]Genererar meddelande...[/cyan]")
-        message = generate_message(lead, client)
-        console.print(Panel(message, title="Förslag på meddelande", border_style="green"))
-
         choice = Prompt.ask(
-            "[y] Spara  [n] Hoppa  [e] Redigera  [q] Avsluta",
-            choices=["y", "n", "e", "q"],
+            "[y] Visa draft  [n] Hoppa  [q] Avsluta",
+            choices=["y", "n", "q"],
         )
 
         if choice == "q":
@@ -74,17 +70,30 @@ def run_interactive_review(
             break
         elif choice == "n":
             continue
-        elif choice == "e":
-            message = Prompt.ask("Skriv ditt meddelande")
-            save_to_queue(lead, message, queue_path)
-            add_to_contacted(lead["author"], contacted_path)
-            console.print("[green]✓ Sparat.[/green]")
-        elif choice == "y":
-            save_to_queue(lead, message, queue_path)
-            add_to_contacted(lead["author"], contacted_path)
-            console.print("[green]✓ Sparat.[/green]")
 
-    console.print(f"\n[bold green]Klar! Godkända leads sparade i {queue_path}[/bold green]")
+        console.print("[cyan]Genererar meddelande...[/cyan]")
+        try:
+            message = generate_message(lead, client)
+        except RuntimeError as e:
+            console.print(f"[red]API-fel: {e}. Hoppar över lead.[/red]")
+            continue
+        console.print(Panel(message, title="Förslag på meddelande", border_style="green"))
+
+        save_choice = Prompt.ask(
+            "[y] Spara  [e] Redigera  [n] Hoppa",
+            choices=["y", "e", "n"],
+        )
+
+        if save_choice == "n":
+            continue
+        elif save_choice == "e":
+            message = Prompt.ask("Skriv ditt meddelande")
+
+        save_to_queue(lead, message, queue_path)
+        add_to_contacted(lead["author"], contacted_path)
+        console.print("[green]✓ Sparat.[/green]")
+    else:
+        console.print(f"\n[bold green]Klar! Godkända leads sparade i {queue_path}[/bold green]")
 
 
 def main() -> None:

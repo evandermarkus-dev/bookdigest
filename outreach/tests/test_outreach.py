@@ -87,12 +87,13 @@ def test_add_to_contacted_no_duplicates(tmp_path):
 # ── run_interactive_review ─────────────────────────────────────────────────────
 
 def test_review_saves_lead_on_y(tmp_path):
+    # Flow: "y" (show draft) → "y" (save)
     queue = tmp_path / "queue.md"
     contacted = tmp_path / "contacted.json"
     mock_client = MagicMock()
 
     with patch("outreach.generate_message", return_value="Hi there!"), \
-         patch("rich.prompt.Prompt.ask", return_value="y"):
+         patch("rich.prompt.Prompt.ask", side_effect=["y", "y"]):
         run_interactive_review(
             [make_lead()], mock_client,
             queue_path=queue, contacted_path=contacted,
@@ -104,6 +105,7 @@ def test_review_saves_lead_on_y(tmp_path):
 
 
 def test_review_skips_lead_on_n(tmp_path):
+    # "n" on first prompt → skips without generating message
     queue = tmp_path / "queue.md"
     contacted = tmp_path / "contacted.json"
     mock_client = MagicMock()
@@ -120,12 +122,13 @@ def test_review_skips_lead_on_n(tmp_path):
 
 
 def test_review_saves_edited_message_on_e(tmp_path):
+    # Flow: "y" (show draft) → "e" (edit) → custom message text
     queue = tmp_path / "queue.md"
     contacted = tmp_path / "contacted.json"
     mock_client = MagicMock()
 
     with patch("outreach.generate_message", return_value="Original draft"), \
-         patch("rich.prompt.Prompt.ask", side_effect=["e", "My custom message"]):
+         patch("rich.prompt.Prompt.ask", side_effect=["y", "e", "My custom message"]):
         run_interactive_review(
             [make_lead()], mock_client,
             queue_path=queue, contacted_path=contacted,
@@ -150,6 +153,23 @@ def test_review_stops_processing_on_q(tmp_path):
         )
 
     assert not queue.exists()
+
+
+def test_review_skips_lead_on_api_error(tmp_path):
+    # If Claude API fails, lead is skipped gracefully
+    queue = tmp_path / "queue.md"
+    contacted = tmp_path / "contacted.json"
+    mock_client = MagicMock()
+
+    with patch("outreach.generate_message", side_effect=RuntimeError("timeout")), \
+         patch("rich.prompt.Prompt.ask", return_value="y"):
+        run_interactive_review(
+            [make_lead()], mock_client,
+            queue_path=queue, contacted_path=contacted,
+        )
+
+    assert not queue.exists()
+    assert not contacted.exists()
 
 
 def test_review_handles_empty_leads_gracefully(tmp_path):
