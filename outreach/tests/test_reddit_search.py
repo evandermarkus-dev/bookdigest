@@ -4,7 +4,7 @@ import json
 import time
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -151,3 +151,64 @@ def test_load_contacted_reads_existing_file():
         path = Path(d) / "contacted.json"
         path.write_text(json.dumps(["user1", "user2"]))
         assert load_contacted(path) == {"user1", "user2"}
+
+
+import reddit_search
+from reddit_search import search_reddit
+
+
+def test_search_reddit_returns_valid_leads():
+    item = make_item()
+    mock_reddit = MagicMock()
+    mock_subreddit = MagicMock()
+    mock_reddit.subreddit.return_value = mock_subreddit
+    mock_subreddit.search.return_value = [item]
+
+    with patch.object(reddit_search, "SUBREDDITS", ["books"]), \
+         patch.object(reddit_search, "SEARCH_TERMS", ["too many books"]):
+        leads = search_reddit(mock_reddit, contacted=set())
+
+    assert len(leads) == 1
+    assert leads[0]["author"] == "reader_99"
+
+
+def test_search_reddit_deduplicates_by_permalink():
+    item = make_item()  # same permalink for both search terms
+    mock_reddit = MagicMock()
+    mock_subreddit = MagicMock()
+    mock_reddit.subreddit.return_value = mock_subreddit
+    mock_subreddit.search.return_value = [item]
+
+    with patch.object(reddit_search, "SUBREDDITS", ["books"]), \
+         patch.object(reddit_search, "SEARCH_TERMS", ["too many books", "reading list"]):
+        leads = search_reddit(mock_reddit, contacted=set())
+
+    assert len(leads) == 1
+
+
+def test_search_reddit_excludes_contacted():
+    item = make_item(username="reader_99")
+    mock_reddit = MagicMock()
+    mock_subreddit = MagicMock()
+    mock_reddit.subreddit.return_value = mock_subreddit
+    mock_subreddit.search.return_value = [item]
+
+    with patch.object(reddit_search, "SUBREDDITS", ["books"]), \
+         patch.object(reddit_search, "SEARCH_TERMS", ["too many books"]):
+        leads = search_reddit(mock_reddit, contacted={"reader_99"})
+
+    assert len(leads) == 0
+
+
+def test_search_reddit_excludes_old_posts():
+    item = make_item(created_days_ago=45)
+    mock_reddit = MagicMock()
+    mock_subreddit = MagicMock()
+    mock_reddit.subreddit.return_value = mock_subreddit
+    mock_subreddit.search.return_value = [item]
+
+    with patch.object(reddit_search, "SUBREDDITS", ["books"]), \
+         patch.object(reddit_search, "SEARCH_TERMS", ["too many books"]):
+        leads = search_reddit(mock_reddit, contacted=set())
+
+    assert len(leads) == 0
