@@ -1,0 +1,5 @@
+praw>=7.7
+anthropic>=0.25
+python-dotenv>=1.0
+rich>=13.0
+pytest>=8.0
