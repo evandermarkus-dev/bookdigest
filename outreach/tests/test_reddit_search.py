@@ -87,6 +87,12 @@ def test_is_bot_passes_real_user():
     assert is_bot(item) is False
 
 
+def test_is_bot_deleted_author_returns_false():
+    item = make_item()
+    item.author = None
+    assert is_bot(item) is False
+
+
 def test_should_include_valid_lead():
     item = make_item()
     assert should_include(item, contacted=set()) is True

@@ -30,6 +30,8 @@ def is_credible_author(item) -> bool:
 
 
 def is_bot(item) -> bool:
+    if item.author is None:
+        return False
     name = item.author.name.lower()
     return "bot" in name or "auto" in name
 
@@ -46,6 +48,8 @@ def should_include(item, contacted: set) -> bool:
 
 
 def build_lead(item) -> dict:
+    if item.author is None:
+        raise ValueError("Cannot build lead for item with deleted author")
     text = getattr(item, "selftext", None) or getattr(item, "body", "")
     return {
         "author": item.author.name,
