@@ -1,0 +1,6 @@
+.env
+contacted.json
+outreach-queue.md
+__pycache__/
+.pytest_cache/
+*.pyc
