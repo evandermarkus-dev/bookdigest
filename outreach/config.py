@@ -1,12 +1,20 @@
 # outreach/config.py
 
 SUBREDDITS = [
+    # Original
     "52book",
     "GradSchool",
     "productivity",
     "selfimprovement",
     "books",
     "mobileread",
+    # New
+    "PhD",
+    "academia",
+    "AskAcademia",
+    "learnprogramming",
+    "kindle",
+    "nosurf",
 ]
 
 SEARCH_TERMS = [
@@ -18,6 +26,15 @@ SEARCH_TERMS = [
     "summarize book",
     "don't have time to read",
     "too many PDFs",
+]
+
+HN_SEARCH_TERMS = [
+    "too many books",
+    "book summary",
+    "summarize book",
+    "PDF book",
+    "reading list",
+    "don't have time to read",
 ]
 
 SEARCH_LOOKBACK_DAYS = 30
