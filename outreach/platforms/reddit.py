@@ -1,7 +1,6 @@
 # outreach/platforms/reddit.py
 
 import time
-from pathlib import Path
 
 import praw
 
@@ -30,6 +29,8 @@ def is_credible_author(item) -> bool:
 
 
 def is_bot(item) -> bool:
+    if item.author is None:
+        return False
     name = item.author.name.lower()
     return "bot" in name or "auto" in name
 
