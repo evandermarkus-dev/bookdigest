@@ -29,7 +29,7 @@ def is_valid_hit(hit: dict, contacted: set) -> bool:
 
 
 def build_lead(hit: dict) -> Lead:
-    text = hit.get("comment_text") or hit.get("title") or ""
+    text = hit.get("comment_text") or hit.get("story_text") or hit.get("title") or ""
     return Lead(
         author=hit["author"],
         platform="hackernews",
@@ -52,7 +52,7 @@ def search(contacted: set) -> list[Lead]:
                 params={
                     "query": term,
                     "tags": "(story,comment)",
-                    "numericFilters": f"created_at_i>{cutoff},points>{_MIN_POINTS}",
+                    "numericFilters": f"created_at_i>{cutoff},points>={_MIN_POINTS}",
                     "hitsPerPage": 50,
                 },
                 timeout=10,

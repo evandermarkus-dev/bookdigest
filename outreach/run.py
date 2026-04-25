@@ -36,7 +36,6 @@ def _append_run_stats(found: int, approved: int, skipped: int) -> None:
 
 
 def main() -> None:
-    load_dotenv()
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
     contacted = load_contacted(CONTACTED_FILE)
 
