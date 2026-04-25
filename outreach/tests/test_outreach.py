@@ -87,6 +87,7 @@ def test_review_saves_lead_on_y(tmp_path):
 
     assert queue.exists()
     assert "reader_99" in queue.read_text()
+    assert contacted.exists()
     assert approved == 1
     assert skipped == 0
 
@@ -132,12 +133,14 @@ def test_review_stops_processing_on_q(tmp_path):
 
     with patch("outreach.generate_message", return_value="Hi!"), \
          patch("rich.prompt.Prompt.ask", return_value="q"):
-        run_interactive_review(
+        approved, skipped = run_interactive_review(
             [make_lead("user1"), make_lead("user2")], mock_client,
             queue_path=queue, contacted_path=contacted,
         )
 
     assert not queue.exists()
+    assert approved == 0
+    assert skipped == 0
 
 
 def test_review_handles_empty_leads_gracefully(tmp_path):

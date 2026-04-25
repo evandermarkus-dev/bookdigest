@@ -9,7 +9,7 @@ from rich.panel import Panel
 from rich.prompt import Prompt
 
 from message_generator import generate_message
-from platforms.base import Lead, add_to_contacted, load_contacted
+from platforms.base import Lead, add_to_contacted
 
 QUEUE_FILE = Path("outreach-queue.md")
 CONTACTED_FILE = Path("contacted.json")
