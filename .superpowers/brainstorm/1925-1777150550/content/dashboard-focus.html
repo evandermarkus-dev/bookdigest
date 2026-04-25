@@ -1,0 +1,33 @@
+<h2>Vad ska dashboardet visa?</h2>
+<p class="subtitle">Välj de sektioner du vill ha — du kan välja flera</p>
+
+<div class="options" data-multiselect>
+  <div class="option" data-choice="stats" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Översiktsstatistik</h3>
+      <p>Totalt kontaktade, plattformsfördelning, godkännandegrad, leads den här veckan</p>
+    </div>
+  </div>
+  <div class="option" data-choice="queue" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Att skicka-kö</h3>
+      <p>Alla godkända meddelanden som ännu inte markerats som skickade, med snabbknappar</p>
+    </div>
+  </div>
+  <div class="option" data-choice="sent" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Skickade / historik</h3>
+      <p>Alla kontaktade leads med datum, plattform och vilket meddelande som skickades</p>
+    </div>
+  </div>
+  <div class="option" data-choice="conversion" onclick="toggleSelect(this)">
+    <div class="letter">D</div>
+    <div class="content">
+      <h3>Konverteringsspårning</h3>
+      <p>Markera om en lead registrerade sig, blev betalande kund — se vad som fungerar</p>
+    </div>
+  </div>
+</div>
