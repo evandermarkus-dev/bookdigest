@@ -1,8 +1,14 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase-server'
 import PricingClient, { type Tier } from '@/components/PricingClient'
 
 export const dynamic = 'force-dynamic'
+
+export const metadata: Metadata = {
+  title: 'Pricing – BookDigest',
+  description: 'Choose a BookDigest plan. Start free with 3 AI summaries per month, or upgrade to Reader or Pro for unlimited access to all summary styles.',
+}
 
 export default async function PricingPage() {
   // Fetch the current user's tier (null = unauthenticated = treat as free)

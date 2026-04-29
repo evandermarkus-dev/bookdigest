@@ -220,7 +220,7 @@ export default function Home() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
               <a href="/books" className="c-nav-link">Books</a>
               <a href="#how" className="c-nav-link">How it works</a>
-              <a href="#pricing" className="c-nav-link">Pricing</a>
+              <a href="/pricing" className="c-nav-link">Pricing</a>
               <a href="/login" className="c-nav-link">Sign in</a>
               <a href="/login" className="c-btn-primary" style={{ padding: '0.5rem 1.125rem', fontSize: '0.875rem' }}>
                 Get Started
@@ -628,6 +628,7 @@ export default function Home() {
             </p>
             <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
               <a href="/books" className="c-nav-link" style={{ fontSize: '0.8125rem' }}>Books</a>
+              <a href="/pricing" className="c-nav-link" style={{ fontSize: '0.8125rem' }}>Pricing</a>
               <a href="/tos" className="c-nav-link" style={{ fontSize: '0.8125rem' }}>Användarvillkor</a>
               <a href="/privacy" className="c-nav-link" style={{ fontSize: '0.8125rem' }}>Integritetspolicy</a>
               <a href="/login" className="c-nav-link" style={{ fontSize: '0.8125rem' }}>Sign In →</a>
