@@ -135,18 +135,46 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Could not extract text from PDF' }, { status: 400 })
     }
 
-    // Call Claude API
+    // Call Claude API with prompt caching
+    // - system prompt cached: same style/language combo reused across requests (~450 tokens)
+    // - book content cached: user may generate multiple styles for the same PDF within 5-min TTL
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 4096,
-      system: getSystemPrompt(style, language, userContext),
+      system: [
+        {
+          type: 'text',
+          text: getSystemPrompt(style, language, userContext),
+          cache_control: { type: 'ephemeral' },
+        },
+      ],
       messages: [
         {
           role: 'user',
-          content: `Here is the book content to summarize:\n\n${text}`,
+          content: [
+            {
+              type: 'text',
+              text: `Here is the book content to summarize:\n\n${text}`,
+              cache_control: { type: 'ephemeral' },
+            },
+          ],
         },
       ],
     })
+
+    // Log cache performance (remove in production or send to analytics)
+    if (process.env.NODE_ENV !== 'production') {
+      const usage = message.usage as typeof message.usage & {
+        cache_creation_input_tokens?: number
+        cache_read_input_tokens?: number
+      }
+      console.log('[summarize] token usage:', {
+        input: usage.input_tokens,
+        output: usage.output_tokens,
+        cache_created: usage.cache_creation_input_tokens ?? 0,
+        cache_read: usage.cache_read_input_tokens ?? 0,
+      })
+    }
 
     const rawContent = message.content[0].type === 'text' ? message.content[0].text : ''
 
