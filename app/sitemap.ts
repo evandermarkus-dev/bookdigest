@@ -11,16 +11,34 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 1,
     },
     {
-      url: `${SITE_URL}/login`,
+      url: `${SITE_URL}/faq`,
       lastModified: new Date(),
       changeFrequency: 'monthly',
-      priority: 0.5,
+      priority: 0.9,
     },
     {
       url: `${SITE_URL}/pricing`,
       lastModified: new Date(),
       changeFrequency: 'monthly',
+      priority: 0.8,
+    },
+    {
+      url: `${SITE_URL}/books`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
       priority: 0.7,
+    },
+    {
+      url: `${SITE_URL}/sv/books`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.7,
+    },
+    {
+      url: `${SITE_URL}/login`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.5,
     },
     {
       url: `${SITE_URL}/tos`,

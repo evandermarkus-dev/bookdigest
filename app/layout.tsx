@@ -25,18 +25,51 @@ const playfair = Playfair_Display({
 const SITE_URL = 'https://bookdigest.se'
 const SITE_NAME = 'BookDigest'
 const SITE_DESCRIPTION =
-  'Upload any non-fiction PDF and get a personalized AI summary in minutes — executive briefing, deep-study notes, or an action plan tailored to your goals.'
+  'AI-powered book summarization — upload any PDF book or research paper and get an executive summary, study guide, or action plan in minutes. Powered by Claude AI. Free to start.'
+
+const organizationJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  '@id': `${SITE_URL}/#organization`,
+  name: SITE_NAME,
+  url: SITE_URL,
+  logo: { '@type': 'ImageObject', url: `${SITE_URL}/opengraph-image` },
+  description: 'AI-powered book and PDF summarization tool. Upload any PDF and get a personalized summary in minutes, powered by Claude AI.',
+}
+
+const webAppJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebApplication',
+  '@id': `${SITE_URL}/#webapp`,
+  name: SITE_NAME,
+  url: SITE_URL,
+  applicationCategory: 'EducationalApplication',
+  operatingSystem: 'Web',
+  description: SITE_DESCRIPTION,
+  offers: [
+    { '@type': 'Offer', name: 'Free', price: '0', priceCurrency: 'SEK', description: '3 AI summaries per month' },
+    { '@type': 'Offer', name: 'Reader', price: '79', priceCurrency: 'SEK', description: '20 AI summaries per month, all styles' },
+    { '@type': 'Offer', name: 'Pro', price: '149', priceCurrency: 'SEK', description: 'Unlimited AI summaries, all features' },
+  ],
+  featureList: [
+    'AI book summarization', 'PDF summarization', 'Personalized summaries',
+    'Executive summary', 'Study guide', 'Action plan', 'Knowledge base',
+    'Research paper analysis', 'Page citations', 'Markdown export', 'PDF export', 'Chat with summary',
+  ],
+}
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: SITE_NAME,
+    default: `${SITE_NAME} — AI Book Summarization`,
     template: `%s | ${SITE_NAME}`,
   },
   description: SITE_DESCRIPTION,
   keywords: [
-    'book summary', 'PDF summary', 'AI book summary', 'book digest',
-    'reading notes', 'study notes', 'executive summary', 'non-fiction',
+    'AI book summary', 'PDF summarization', 'book summary app', 'AI reading assistant',
+    'book digest', 'summarize PDF with AI', 'executive book summary', 'study guide generator',
+    'research paper summary', 'non-fiction summary', 'personalized book summary', 'Claude AI',
+    'boksammanfattning AI', 'sammanfatta PDF', 'AI läsassistent',
   ],
   authors: [{ name: SITE_NAME, url: SITE_URL }],
   creator: SITE_NAME,
@@ -71,6 +104,14 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <PlausibleProvider domain="bookdigest.se" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(webAppJsonLd) }}
+        />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} antialiased`}
