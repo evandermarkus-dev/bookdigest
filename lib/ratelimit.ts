@@ -47,7 +47,18 @@ export async function checkRateLimit(
 ): Promise<NextResponse | null> {
   if (!limiters) return null // Redis not configured — skip silently
 
-  const { success, limit, remaining, reset } = await limiters[route].limit(userId)
+  // Fail open: rate limiting is a safeguard, not a dependency. If Redis is
+  // unreachable (e.g. an archived free-tier database), log and allow the
+  // request instead of failing the whole route with a 500.
+  let result: Awaited<ReturnType<Ratelimit['limit']>>
+  try {
+    result = await limiters[route].limit(userId)
+  } catch (err) {
+    console.error(`[ratelimit] Redis unavailable for route "${route}", allowing request:`, err)
+    return null
+  }
+
+  const { success, limit, reset } = result
 
   if (!success) {
     const retryAfterSec = Math.ceil((reset - Date.now()) / 1000)
