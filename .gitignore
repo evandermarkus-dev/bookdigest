@@ -42,3 +42,13 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# local tooling state (Claude Code, Playwright MCP, brainstorm sessions)
+.claude/settings.local.json
+.claude/launch.json
+.claude/worktrees/
+.playwright-mcp/
+.superpowers/
+
+# private research notes
+leads-early-adopters.md
