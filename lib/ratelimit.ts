@@ -33,6 +33,7 @@ export const limiters = redis ? {
   chat:      makeLimiter(redis, 30, '1 h',  'chat'),      // Claude Haiku chat messages
   audio:     makeLimiter(redis, 5,  '1 h',  'audio'),     // Claude script + OpenAI TTS
   skill:     makeLimiter(redis, READER_SKILL_LIMIT, '30 d', 'skill'), // Claude Code skill generation
+  saga:      makeLimiter(redis, 30, '1 h',  'saga'),      // Onboarding assistant (Haiku)
 } : null
 
 // ---------------------------------------------------------------------------
